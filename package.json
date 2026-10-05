@@ -1,0 +1,24 @@
+{
+  "name": "protect-me",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Protect Me — governance gate, edge shield, and operating contract for founder-run software portfolios.",
+  "license": "SEE LICENSE IN LICENSE",
+  "type": "module",
+  "exports": {
+    "./shield": "./shield/shield.mjs"
+  },
+  "scripts": {
+    "test": "node --test shield/shield.test.mjs && python3 gate/test_worlds_gate.py",
+    "e2e": "playwright test",
+    "gate": "python3 gate/worlds_gate.py",
+    "gate:example": "python3 gate/worlds_gate.py examples/worlds.example.json"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.61.1",
+    "wrangler": "4.118.0"
+  }
+}

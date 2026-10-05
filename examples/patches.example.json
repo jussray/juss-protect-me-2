@@ -1,0 +1,32 @@
+{
+  "_note": "EXAMPLE patch queue. Each patch targets one world from worlds.example.json.",
+  "patches": [
+    {
+      "id": "auth-otp",
+      "world": "core-auth",
+      "commit": "abc1234",
+      "branch": "fix/otp-recovery",
+      "summary": "Add OTP recovery path",
+      "files": ["src/api/otp.ts"],
+      "rollback": "git revert abc1234",
+      "approvals": ["founder"]
+    },
+    {
+      "id": "auth-keys",
+      "world": "core-auth",
+      "commit": "def5678",
+      "summary": "Rotate key derivation",
+      "files": ["src/crypto/kdf.ts"],
+      "approvals": ["founder"]
+    },
+    {
+      "id": "checkout-copy",
+      "world": "app-web",
+      "commit": "0a1b2c3",
+      "summary": "Checkout button copy",
+      "files": ["src/pages/checkout.tsx"],
+      "checks": {"build": {"status": "pass", "evidence": "https://ci.example/run/303"}, "e2e-checkout": {"status": "pass", "evidence": "https://ci.example/run/303/playwright-report"}},
+      "approvals": ["founder"]
+    }
+  ]
+}

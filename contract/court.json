@@ -1,0 +1,7 @@
+{
+  "_note": "Who sits where. Replace with your own people and agents. The owner is the only seat that can accept, merge, or deploy.",
+  "owner": "[YOUR NAME]",
+  "orchestrator": "[OPTIONAL — e.g. ChatGPT]",
+  "writer": "Claude",
+  "challengers": ["[OPTIONAL — e.g. Codex]", "[OPTIONAL — e.g. Perplexity]"]
+}

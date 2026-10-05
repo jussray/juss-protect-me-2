@@ -1,0 +1,67 @@
+{
+  "_note": "EXAMPLE map. Replace with your own worlds. Every field except id is optional, but missing fields make the report say UNKNOWN instead of guessing.",
+  "worlds": [
+    {
+      "id": "core-auth",
+      "repo": "github.com/acme/core-auth",
+      "branch": "main",
+      "local_path": "../core-auth",
+      "depends_on": [],
+      "governance": {
+        "owner": "founder",
+        "merge_policy": "founder-only",
+        "required_checks": ["typecheck", "unit", "e2e-login"],
+        "requires_approval_from": ["founder"],
+        "protected_paths": ["migrations/*", "src/crypto/*"],
+        "protected_approvers": ["founder", "security"],
+        "public_surface": ["src/api/*", "src/types/*"],
+        "forbidden_paths": [".env*"]
+      },
+      "state": {
+        "checks": {
+          "typecheck": {"status": "pass", "evidence": "https://ci.example/run/101"},
+          "unit": {"status": "pass", "evidence": "https://ci.example/run/101"},
+          "e2e-login": {"status": "pass", "evidence": "https://ci.example/run/101/playwright-report"}
+        }
+      }
+    },
+    {
+      "id": "billing",
+      "repo": "github.com/acme/billing",
+      "depends_on": ["core-auth"],
+      "governance": {
+        "owner": "ops",
+        "merge_policy": "two-approvals",
+        "required_checks": ["unit", "stripe-sandbox"],
+        "requires_approval_from": ["ops", "founder"],
+        "public_surface": ["src/webhooks/*"]
+      },
+      "state": {"checks": {"unit": {"status": "pass"}, "stripe-sandbox": {"status": "fail", "evidence": "https://ci.example/run/202"}}}
+    },
+    {
+      "id": "app-web",
+      "repo": "github.com/acme/app-web",
+      "depends_on": ["core-auth", "billing"],
+      "governance": {
+        "owner": "founder",
+        "merge_policy": "founder-only",
+        "required_checks": ["build", "e2e-checkout"],
+        "requires_approval_from": ["founder"],
+        "public_surface": []
+      },
+      "state": {"checks": {}}
+    },
+    {
+      "id": "marketing-site",
+      "repo": "github.com/acme/site",
+      "depends_on": [],
+      "governance": {
+        "owner": "marketing",
+        "merge_policy": "auto-after-checks",
+        "required_checks": ["build"],
+        "frozen": true,
+        "freeze_reason": "launch-week content freeze"
+      }
+    }
+  ]
+}
