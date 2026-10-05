@@ -1,0 +1,21 @@
+{
+  "_note": "EXAMPLE preflight for one material change. Every field takes a value or the literal UNKNOWN.",
+  "authoritative_source": "github.com/acme/billing @ main 9f2c1ab",
+  "target": "billing / main / production Worker",
+  "goal": "stripe-sandbox check green so app-web can ship",
+  "consequence_class": "reversible",
+  "authority": {"holder": "ops", "state": "VERIFIED", "action": "commit fix on branch; merge needs ops + founder"},
+  "bottleneck": "stripe-sandbox failing (https://ci.example/run/202)",
+  "first_evidence": "CI run 202 failing step log",
+  "budget": {"class": "repair", "max_rounds": 4, "require_evidence": true, "stop_when": ["check green on exact head", "two failed hypotheses", "needs a secret we don't hold"]},
+  "stop_condition": "stripe-sandbox green on the exact candidate head, or BLOCKED after two hypotheses",
+  "rollback": "git revert <sha>",
+  "planes": {"reasoning_mode": "ULTRATHINK", "requested_authority_change": false},
+  "devil_i": {"premise_holds": true, "falsifier": "check is flaky on main too (would make this not our bug)", "smaller_path": "none found"},
+  "options": [
+    {"name": "fix-webhook-signature", "founder_value": "unblocks checkout", "evidence": "log shows signature mismatch", "consequence": "reversible", "authority_required": "ops", "reversibility": "git revert", "cost": "1h", "failure_mode": "sandbox secret rotated, not code", "proof_required": "stripe-sandbox green on exact head"},
+    {"name": "pin-stripe-api-version", "founder_value": "same", "evidence": "INFERRED from changelog", "consequence": "reversible", "authority_required": "ops", "reversibility": "git revert", "cost": "30m", "failure_mode": "masks real drift", "proof_required": "same"}
+  ],
+  "selected": "fix-webhook-signature",
+  "devil_ii": {"breaking_assumption": "the sandbox secret in CI is current", "stale_state_risk": "a cached green run from before the secret rotation could look current"}
+}

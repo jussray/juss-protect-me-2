@@ -1,0 +1,18 @@
+{
+  // Copy into your project and change name/main/assets to match.
+  "name": "protect-me-shield-example",
+  "compatibility_date": "2026-07-11",
+  "main": "worker.mjs",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+  "ratelimits": [
+    {
+      "name": "SHIELD_RATE_LIMITER",
+      "namespace_id": "1001",
+      "simple": { "limit": 20, "period": 60 }
+    }
+  ]
+}
