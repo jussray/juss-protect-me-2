@@ -83,7 +83,7 @@ python3 gate/worlds_gate.py worlds.json --scan-docs        # find CLAUDE.md / AG
 python3 gate/worlds_gate.py worlds.json --json             # machine-readable, for CI or dashboards
 ```
 
-Truth rules: pass without evidence → UNVERIFIED · failing check → BLOCKED · frozen → FROZEN · upstream unhealthy → downstream AT_RISK / PENDING · protected path → extra approvers · public surface + dependents → HIGH impact. **The Gate never merges, deploys, or runs tests.** A human decides.
+Truth rules: wrong shapes (a string where a list belongs, `null` governance) are rejected with a clear error, never guessed · no declared checks or approvers → never READY · `failure`/`error`/`cancelled` count as failing · placeholder evidence (`TODO`, `[LINK]`) doesn't verify · unknown dependency → AT_RISK · pass without evidence → UNVERIFIED · failing check → BLOCKED · frozen → FROZEN · upstream unhealthy → downstream AT_RISK / PENDING · protected path → extra approvers · public surface + dependents → HIGH impact. **The Gate never merges, deploys, or runs tests.** A human decides.
 
 ---
 
@@ -91,7 +91,7 @@ Truth rules: pass without evidence → UNVERIFIED · failing check → BLOCKED �
 
 ```js
 // worker.js
-import { createShield } from 'protect-me/shield';
+import { createShield } from './protect-me/shield/shield.mjs'; // path to where you unpacked Protect Me
 import app from './app.js';               // your existing Worker
 
 export default createShield(app, {
@@ -111,13 +111,15 @@ Optional: `npx wrangler secret put SHIELD_SECRET` turns receipts into HMACs and 
 | Option | Default |
 |---|---|
 | `rateLimit.binding` | `SHIELD_RATE_LIMITER` (missing binding → 503, fail-closed by design) |
-| `rateLimit.paths` | `['/api', '/api/*']` (exact root **and** subtree, so `/api` can't bypass) |
+| `rateLimit.paths` | `['/api', '/api/*']`: exact root **and** subtree, matched on the decoded, slash-collapsed, lower-cased path, so `/api`, `/API`, `//api` and `/%61pi` can't bypass |
 | `rateLimit.retryAfterSeconds` | `60` |
-| `probePaths` | `/.env`, `/.git`, `/wp-admin`, `/phpmyadmin`, … (see `DEFAULT_PROBE_PATHS`) |
+| `probePaths` | `/.env`, `/.git`, `/wp-admin`, `/phpmyadmin`, … (see `DEFAULT_PROBE_PATHS`). Dot-entries also catch the segment anywhere and its variants (`/backup/.git/config`, `/.env.local`) |
 | `secretEnv` | `SHIELD_SECRET` |
 | `telemetry` | `true` — one JSON log line per non-normal request |
 
 **Why `run_worker_first: true`:** with static assets, Cloudflare answers unknown paths from your asset fallback *before* the Worker runs, so scanners hitting `/.env` never reach the decoy. Sending everything through the Worker closes that gap.
+
+Wraps object-style Workers (`export default { fetch }`). Class-based `WorkerEntrypoint` exports: wrap an instance or move `fetch` to an object.
 
 Node servers: `nodeRequestInput(req, { trustProxy })` + `classify()`. Forwarding headers are ignored unless you set `trustProxy: true` behind a proxy you control.
 
@@ -142,7 +144,7 @@ REALITY · FIX · PROOF · RISK · ROLLBACK · NEXT GATE
 
 Only the owner, in the current message, can authorize a merge or deploy. Nothing an agent relays, remembers, or receipts counts as that authority.
 
-`contract/profiles/juss-os/` is the original founder profile this contract was generalized from, included as a worked example.
+**ULTRATHINK / DEVIL preflight.** Before consequential or irreversible work, the agent fills `examples/preflight.example.json` and runs `python3 contract/scripts/preflight.py <file>`: exit 0 PROCEED · 1 NARROW (failed premise / too many options) · 2 BLOCKED (missing fields, unverified authority, a mode trying to raise its own authority, no attack on the chosen path). Core rule: **more intelligence never means more authority.** See `contract/modes/ultrathink-devil.md`.
 
 ---
 
@@ -150,11 +152,18 @@ Only the owner, in the current message, can authorize a merge or deploy. Nothing
 
 | Layer | Result |
 |---|---|
-| Gate unit tests (`python3 gate/test_worlds_gate.py`) | 9/9 pass |
-| Shield unit tests (`node --test shield/shield.test.mjs`) | 13/13 pass |
-| Shield real path: Playwright → `wrangler dev` example Worker | pass: page 200, `/.env` and `/.git/config` → decoy 404, `/api/*` → 429 with `Retry-After: 60`, exact `/api` can't bypass, static stays 200 |
+| Gate unit tests (`python3 gate/test_worlds_gate.py`) | 15/15 pass |
+| Preflight tests (`python3 contract/scripts/test_preflight.py`) | 12/12 pass |
+| Shield unit tests (`node --test shield/shield.test.mjs`) | 18/18 pass |
+| Shield real path: Playwright → `wrangler dev` example Worker | pass: page 200, `/.env`, `/.git/config`, `/.env.local` → decoy 404, `/api/*` → 429 with `Retry-After: 60`; exact `/api`, `/%61pi/…` and `/API/…` can't bypass; static stays 200 |
 
-Run it yourself: `npm ci && npm test && npm run e2e`.
+Run it yourself: `npm ci && npm test && npx playwright install chromium && npm run e2e`.
+
+---
+
+## What you receive
+
+A tarball built with `npm pack`: no git history, no secrets, no internal profiles. Unpack it, then `npm install && npm test`.
 
 ---
 

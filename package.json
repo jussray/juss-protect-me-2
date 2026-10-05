@@ -2,17 +2,18 @@
   "name": "protect-me",
   "version": "1.0.0",
   "private": true,
-  "description": "Protect Me — governance gate, edge shield, and operating contract for founder-run software portfolios.",
+  "description": "Protect Me \u2014 governance gate, edge shield, and operating contract for founder-run software portfolios.",
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "exports": {
     "./shield": "./shield/shield.mjs"
   },
   "scripts": {
-    "test": "node --test shield/shield.test.mjs && python3 gate/test_worlds_gate.py",
+    "test": "node --test shield/shield.test.mjs && python3 gate/test_worlds_gate.py && python3 contract/scripts/test_preflight.py",
     "e2e": "playwright test",
     "gate": "python3 gate/worlds_gate.py",
-    "gate:example": "python3 gate/worlds_gate.py examples/worlds.example.json"
+    "gate:example": "python3 gate/worlds_gate.py examples/worlds.example.json",
+    "package": "npm pack"
   },
   "engines": {
     "node": ">=20"
@@ -20,5 +21,24 @@
   "devDependencies": {
     "@playwright/test": "1.61.1",
     "wrangler": "4.118.0"
-  }
+  },
+  "files": [
+    "README.md",
+    "LICENSE",
+    "gate/worlds_gate.py",
+    "gate/test_worlds_gate.py",
+    "shield/shield.mjs",
+    "shield/shield.test.mjs",
+    "e2e/shield.spec.mjs",
+    "playwright.config.mjs",
+    "examples/",
+    "contract/SKILL.md",
+    "contract/court.json",
+    "contract/references/",
+    "contract/modes/",
+    "contract/scripts/",
+    "shield/example/worker.mjs",
+    "shield/example/wrangler.jsonc",
+    "shield/example/public/index.html"
+  ]
 }

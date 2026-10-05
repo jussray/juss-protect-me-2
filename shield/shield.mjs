@@ -39,22 +39,63 @@ export const DEFAULTS = Object.freeze({
   telemetry: true,
 });
 
+const isPathList = (v) => Array.isArray(v) && v.every((x) => typeof x === 'string' && x.startsWith('/'));
+
 export function resolveConfig(config = {}) {
-  return Object.freeze({
+  const cfg = Object.freeze({
     ...DEFAULTS,
     ...config,
     rateLimit: Object.freeze({ ...DEFAULTS.rateLimit, ...(config.rateLimit ?? {}) }),
   });
+  // Fail at startup, not on every request, when the config is malformed.
+  if (!isPathList(cfg.rateLimit.paths)) throw new TypeError('shield config: rateLimit.paths must be an array of paths starting with "/"');
+  if (!isPathList(cfg.probePaths)) throw new TypeError('shield config: probePaths must be an array of paths starting with "/"');
+  if (!(Number.isInteger(cfg.rateLimit.retryAfterSeconds) && cfg.rateLimit.retryAfterSeconds > 0)) {
+    throw new TypeError('shield config: rateLimit.retryAfterSeconds must be a positive integer');
+  }
+  if (typeof cfg.rateLimit.binding !== 'string' || !cfg.rateLimit.binding) throw new TypeError('shield config: rateLimit.binding must be a name');
+  return cfg;
 }
 
-// "/api" matches exactly; "/api/*" matches anything below /api/.
+/**
+ * The path as a permissive router would see it: percent-decoded (repeatedly, so
+ * %2561 cannot hide "a"), duplicate slashes collapsed, lower-cased. Matching on
+ * this means "/%61pi", "/API" and "//api" cannot dodge a rule for "/api".
+ * Over-matching only ever makes the Shield stricter.
+ */
+export function canonicalPath(pathname) {
+  let p = String(pathname ?? '/');
+  for (let i = 0; i < 3; i += 1) {
+    let next;
+    try { next = decodeURIComponent(p); } catch { break; }
+    if (next === p) break;
+    p = next;
+  }
+  p = p.replace(/\\/g, '/').replace(/\/{2,}/g, '/').toLowerCase();
+  return p.startsWith('/') ? p : `/${p}`;
+}
+
+// "/api" matches exactly; "/api/*" matches anything below /api/. Case-insensitive, on the canonical path.
 export function matchPath(pathname, patterns) {
-  return patterns.some((p) => (p.endsWith('/*') ? pathname.startsWith(p.slice(0, -1)) : pathname === p));
+  const path = canonicalPath(pathname);
+  return patterns.some((raw) => {
+    const pat = raw.toLowerCase();
+    return pat.endsWith('/*') ? path.startsWith(pat.slice(0, -1)) : path === pat || path === `${pat}/`;
+  });
 }
 
+// Prefix match on the canonical path; dot-entries like "/.env" or "/.git" also match
+// that segment anywhere ("/backup/.git/config") and its variants (".env.local").
 export function isProbePath(pathname, probePaths = DEFAULT_PROBE_PATHS) {
-  const p = pathname.toLowerCase();
-  return probePaths.some((c) => p === c || p.startsWith(`${c}/`));
+  const path = canonicalPath(pathname);
+  const segments = path.split('/');
+  return probePaths.some((raw) => {
+    const c = raw.toLowerCase();
+    if (path === c || path.startsWith(`${c}/`)) return true;
+    const name = c.slice(1);
+    return c.startsWith('/.') && !name.includes('/')
+      && segments.some((seg) => seg === name || seg.startsWith(`${name}.`));
+  });
 }
 
 function clean(value, max = 256) {
@@ -180,8 +221,17 @@ export async function rateLimit(request, env, config = DEFAULTS) {
   // Only Cloudflare's own header is trusted. A missing edge identity shares one
   // fail-safe bucket instead of letting the client pick its own key.
   const ip = clean(request.headers.get('cf-connecting-ip'), 96);
-  const { success } = await limiter.limit({ key: ip ? `ip:${ip}` : 'ip:unknown' });
-  if (success) return null;
+  let outcome;
+  try {
+    outcome = await limiter.limit({ key: ip ? `ip:${ip}` : 'ip:unknown' });
+  } catch {
+    outcome = null;
+  }
+  if (!outcome || typeof outcome.success !== 'boolean') {
+    // A limiter that throws or answers nonsense fails closed, same as a missing one.
+    return jsonResponse(503, { ok: false, error: 'rate_limit_unavailable' });
+  }
+  if (outcome.success) return null;
   return jsonResponse(429, { ok: false, error: 'rate_limit_exceeded' },
     { 'retry-after': String(cfg.rateLimit.retryAfterSeconds) });
 }

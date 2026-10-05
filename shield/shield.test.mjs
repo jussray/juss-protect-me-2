@@ -109,3 +109,39 @@ test('Node adapter distrusts forwarding headers unless trustProxy is set', () =>
 test('TRACE and CONNECT are treated as probes', async () => {
   assert.equal((await classify({ method: 'TRACE', url: '/' })).event.verdict, 'PROBE');
 });
+
+test('encoded, upper-case and double-slash variants cannot dodge the rate limit', async () => {
+  const env = { SHIELD_RATE_LIMITER: limiterThatAllows(0) };
+  for (const p of ['/%61pi/x', '/API/x', '//api/x', '/%2561pi', '/ap%69', '/Api']) {
+    assert.equal((await rateLimit(req(p), env))?.status, 429, p);
+  }
+  assert.equal(await rateLimit(req('/apix'), env), null);
+});
+
+test('dot-file probes are caught anywhere in the path and in variants', async () => {
+  const shield = createShield(upstream);
+  for (const p of ['/.env.local', '/.env.bak', '/%2eenv', '//.env', '/foo/.env', '/backup/.git/config', '/.ENV']) {
+    assert.equal((await shield.fetch(req(p), {}, {})).status, 404, p);
+  }
+  assert.equal(await (await shield.fetch(req('/environment'), {}, {})).text(), 'app');
+});
+
+test('custom probe paths match case-insensitively', async () => {
+  const shield = createShield(upstream, { probePaths: ['/Admin'] });
+  assert.equal((await shield.fetch(req('/Admin'), {}, {})).status, 404);
+  assert.equal((await shield.fetch(req('/admin/x'), {}, {})).status, 404);
+});
+
+test('a limiter that throws or answers nonsense fails closed with 503', async () => {
+  for (const limit of [async () => { throw new Error('kv down'); }, async () => undefined, async () => ({})]) {
+    const res = await rateLimit(req('/api'), { SHIELD_RATE_LIMITER: { limit } });
+    assert.equal(res.status, 503);
+    assert.deepEqual(await res.json(), { ok: false, error: 'rate_limit_unavailable' });
+  }
+});
+
+test('malformed config is rejected at startup, not on every request', () => {
+  assert.throws(() => createShield(upstream, { rateLimit: { paths: '/api/*' } }), /rateLimit.paths/);
+  assert.throws(() => createShield(upstream, { probePaths: ['admin'] }), /probePaths/);
+  assert.throws(() => createShield(upstream, { rateLimit: { retryAfterSeconds: 0 } }), /retryAfterSeconds/);
+});

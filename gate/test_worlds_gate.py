@@ -57,7 +57,7 @@ class WorldsPatchRegressionTests(unittest.TestCase):
             "app-web": "AT_RISK", "marketing-site": "FROZEN",
         })
         self.assertTrue(posture["app-web"]["next_gate"].startswith("Fix upstream first: billing"))
-        self.assertTrue(any("no evidence" in u for u in posture["billing"]["unverified"]))
+        self.assertTrue(any("no real evidence" in u for u in posture["billing"]["unverified"]))
 
     def test_posture_never_guesses_missing_fields(self):
         posture = worlds_gate.world_posture(worlds_gate.evaluate([{"id": "bare"}], []))["bare"]
@@ -86,6 +86,50 @@ class WorldsPatchRegressionTests(unittest.TestCase):
         r = worlds_gate.evaluate(worlds, [{"id": "p", "world": "down", "files": ["a.ts"]}])["results"][0]
         self.assertEqual(r["status"], "PENDING")
         self.assertTrue(any("upstream world 'up' is failing unit" in x for x in r["pending"]))
+
+    def test_undeclared_world_is_never_ready(self):
+        r = worlds_gate.evaluate([{"id": "a"}], [{"id": "p", "world": "a", "files": ["x"]}])["results"][0]
+        self.assertEqual(r["status"], "PENDING")
+        self.assertTrue(any("readiness is UNKNOWN" in x for x in r["pending"]))
+
+    def test_strings_where_lists_belong_are_rejected_not_iterated(self):
+        gov = {"required_checks": ["u"], "requires_approval_from": ["o"], "forbidden_paths": [".env*"]}
+        with self.assertRaisesRegex(ValueError, "files must be a list"):
+            worlds_gate.evaluate([{"id": "a", "governance": gov}], [{"id": "p", "world": "a", "files": ".env"}])
+        with self.assertRaisesRegex(ValueError, "depends_on must be a list"):
+            worlds_gate.evaluate([{"id": "a", "depends_on": "b"}, {"id": "b"}], [])
+        with self.assertRaisesRegex(ValueError, "governance must be an object"):
+            worlds_gate.evaluate([{"id": "a", "governance": None}], [])
+        with self.assertRaisesRegex(ValueError, "state.checks must map"):
+            worlds_gate.evaluate([{"id": "a", "state": {"checks": ["unit"]}}], [])
+
+    def test_github_style_failure_statuses_block(self):
+        for st in ("FAIL", "failure", "error", "cancelled"):
+            w = [{"id": "a", "governance": {"required_checks": ["u"]}, "state": {"checks": {"u": {"status": st}}}}]
+            self.assertEqual(worlds_gate.world_posture(worlds_gate.evaluate(w, []))["a"]["status"], "BLOCKED", st)
+
+    def test_placeholder_evidence_does_not_verify(self):
+        for ev in ("TODO", "tbd", "[LINK]", "  "):
+            w = [{"id": "a", "governance": {"required_checks": ["u"]},
+                  "state": {"checks": {"u": {"status": "success", "evidence": ev}}}}]
+            self.assertEqual(worlds_gate.world_posture(worlds_gate.evaluate(w, []))["a"]["status"], "UNVERIFIED", ev)
+
+    def test_typo_dependency_is_not_healthy(self):
+        w = [{"id": "a", "depends_on": ["core-auht"], "governance": {"required_checks": ["u"]},
+              "state": {"checks": {"u": {"status": "pass", "evidence": "https://ci/1"}}}}]
+        p = worlds_gate.world_posture(worlds_gate.evaluate(w, []))["a"]
+        self.assertEqual(p["status"], "AT_RISK")
+        self.assertTrue(any("undeclared world(s): core-auht" in u for u in p["unknown"]))
+
+    def test_cli_reports_bad_input_without_traceback(self):
+        import subprocess, sys, tempfile, os
+        with tempfile.TemporaryDirectory() as t:
+            f = os.path.join(t, "w.json")
+            for doc in ('{"world": []}', '[{"id": "a", "governance": null}]'):
+                open(f, "w").write(doc)
+                r = subprocess.run([sys.executable, str(MODULE_PATH), f], capture_output=True, text=True)
+                self.assertEqual(r.returncode, 2, r.stderr)
+                self.assertNotIn("Traceback", r.stderr)
 
 if __name__ == "__main__":
     unittest.main()

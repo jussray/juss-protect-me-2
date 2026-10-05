@@ -5,7 +5,10 @@ import { createShield } from '../shield.mjs';
 
 const app = {
   async fetch(request, env) {
-    const { pathname } = new URL(request.url);
+    // Decode like popular routers (Hono, itty) do — this is what made
+    // "/%61pi" reach /api before the Shield canonicalized paths.
+    let { pathname } = new URL(request.url);
+    try { pathname = decodeURIComponent(pathname).toLowerCase(); } catch { /* keep raw */ }
     if (pathname === '/api' || pathname.startsWith('/api/')) {
       return Response.json({ ok: true, path: pathname });
     }

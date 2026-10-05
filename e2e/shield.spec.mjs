@@ -1,7 +1,7 @@
 /* global fetch */
 import { test, expect } from '@playwright/test';
 
-test('real Worker: page loads, probes get the decoy, /api is rate limited without bypass', async ({ page }) => {
+test('real Worker: page loads, probes get the decoy, /api is rate limited without bypass (incl. encoded/upper-case)', async ({ page }) => {
   const home = await page.goto('/');
   expect(home?.status()).toBe(200);
   await expect(page.locator('#status')).toHaveText('Protected by Protect Me Shield');
@@ -22,6 +22,9 @@ test('real Worker: page loads, probes get the decoy, /api is rate limited withou
       }
     }
     const exactRoot = await fetch('/api', { cache: 'no-store' });
+    const encoded = await fetch('/%61pi/hello', { cache: 'no-store' });
+    const upper = await fetch('/API/hello', { cache: 'no-store' });
+    const envVariant = await fetch('/.env.local', { cache: 'no-store' });
     const staticAfter = await fetch('/', { cache: 'no-store' });
     return {
       probeStatus: probe.status,
@@ -33,6 +36,10 @@ test('real Worker: page loads, probes get the decoy, /api is rate limited withou
       retryAfter,
       body,
       exactRootStatus: exactRoot.status,
+      encodedStatus: encoded.status,
+      upperStatus: upper.status,
+      envVariantStatus: envVariant.status,
+      envVariantBody: await envVariant.json(),
       staticStatus: staticAfter.status,
     };
   });
@@ -46,5 +53,9 @@ test('real Worker: page loads, probes get the decoy, /api is rate limited withou
   expect(proof.retryAfter).toBe('60');
   expect(proof.body).toEqual({ ok: false, error: 'rate_limit_exceeded' });
   expect(proof.exactRootStatus).toBe(429);
+  expect(proof.encodedStatus).toBe(429);
+  expect(proof.upperStatus).toBe(429);
+  expect(proof.envVariantStatus).toBe(404);
+  expect(proof.envVariantBody).toEqual({ error: 'not_found' });
   expect(proof.staticStatus).toBe(200);
 });

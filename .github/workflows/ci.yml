@@ -23,6 +23,18 @@ jobs:
         run: npm test
       - name: Gate runs on the example map
         run: python3 gate/worlds_gate.py examples/worlds.example.json examples/patches.example.json > /dev/null
+      - name: Package contains only the allowlist (no dev state, git data, env files, internal profiles)
+        run: |
+          set -euo pipefail
+          npm pack --dry-run --json > pack.json
+          node -e "
+            const files = JSON.parse(require('fs').readFileSync('pack.json','utf8'))[0].files.map(f => f.path);
+            const bad = files.filter(f => /(^|\/)(\.wrangler|\.git|node_modules|profiles)(\/|$)|\.env($|\.)|\.dev\.vars|\.sqlite|\.pem$|\.key$/.test(f));
+            console.log(files.length + ' files packed');
+            if (bad.length) { console.error('LEAK:', bad); process.exit(1); }
+          "
+      - name: Preflight gate runs on the example
+        run: python3 contract/scripts/preflight.py examples/preflight.example.json --compact
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
       - name: Shield real-path witness (Playwright through wrangler dev)

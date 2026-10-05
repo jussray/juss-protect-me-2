@@ -23,6 +23,62 @@ GOV_FILES = ["GOVERNANCE.md", "AGENTS.md", "CLAUDE.md", "CODEOWNERS", ".github/C
              "SECURITY.md", "CONTRIBUTING.md", "docs/GOVERNANCE.md"]
 
 
+FAIL_STATUSES = {"fail", "failed", "failure", "error", "cancelled", "canceled", "timed_out"}
+PASS_STATUSES = {"pass", "passed", "success", "succeeded"}
+PLACEHOLDER_EVIDENCE = {"todo", "tbd", "n/a", "na", "none", "pending", "-", "?", "link", "url"}
+LIST_FIELDS = ("required_checks", "requires_approval_from", "protected_paths", "protected_approvers",
+               "public_surface", "forbidden_paths")
+
+
+def norm_status(check):
+    st = str((check or {}).get("status", "unknown")).strip().lower()
+    return "fail" if st in FAIL_STATUSES else "pass" if st in PASS_STATUSES else st
+
+
+def real_evidence(ev):
+    """Evidence counts only if it is a non-placeholder string (a URL, artifact path, run id...)."""
+    if not isinstance(ev, str):
+        return None
+    e = ev.strip()
+    if not e or e.lower() in PLACEHOLDER_EVIDENCE or (e.startswith("[") and e.endswith("]")):
+        return None
+    return e
+
+
+def _is_str_list(v):
+    return isinstance(v, list) and all(isinstance(x, str) for x in v)
+
+
+def validate(worlds, patches):
+    """Reject shapes that would otherwise be silently misread (strings iterated as lists, nulls, ...)."""
+    errs = []
+    for i, w in enumerate(worlds):
+        wid = w.get("id", f"#{i}")
+        if "depends_on" in w and not _is_str_list(w["depends_on"]):
+            errs.append(f"world '{wid}': depends_on must be a list of world ids")
+        for key in ("governance", "state"):
+            if key in w and not isinstance(w[key], dict):
+                errs.append(f"world '{wid}': {key} must be an object")
+        gov = w.get("governance") if isinstance(w.get("governance"), dict) else {}
+        for f in LIST_FIELDS:
+            if f in gov and not _is_str_list(gov[f]):
+                errs.append(f"world '{wid}': governance.{f} must be a list of strings")
+        st = w.get("state") if isinstance(w.get("state"), dict) else {}
+        checks = st.get("checks", {})
+        if not isinstance(checks, dict) or not all(isinstance(c, dict) for c in checks.values()):
+            errs.append(f"world '{wid}': state.checks must map check name -> {{status, evidence}}")
+    for i, p in enumerate(patches):
+        pid = p.get("id", f"#{i}")
+        for f in ("files", "approvals"):
+            if f in p and not _is_str_list(p[f]):
+                errs.append(f"patch '{pid}': {f} must be a list of strings")
+        checks = p.get("checks", {})
+        if not isinstance(checks, dict) or not all(isinstance(c, dict) for c in checks.values()):
+            errs.append(f"patch '{pid}': checks must map check name -> {{status, evidence}}")
+    if errs:
+        raise ValueError("invalid input:\n  - " + "\n  - ".join(errs))
+
+
 def build_graph(worlds):
     ids = {w["id"] for w in worlds}
     problems = []
@@ -111,7 +167,7 @@ def touches(files, patterns):
 def upstream_failing_checks(world):
     """Required checks that are recorded as failing on a world's own baseline."""
     gov, checks = world.get("governance", {}), world.get("state", {}).get("checks", {})
-    return [n for n in gov.get("required_checks", []) if checks.get(n, {}).get("status") == "fail"]
+    return [n for n in gov.get("required_checks", []) if norm_status(checks.get(n)) == "fail"]
 
 
 def eval_patch(p, W, deps, rdeps, cyclic, upstream_status):
@@ -135,18 +191,22 @@ def eval_patch(p, W, deps, rdeps, cyclic, upstream_status):
         blocked.append(f"touches forbidden paths: {', '.join(hit_forbidden)}")
 
     checks = {**state.get("checks", {}), **p.get("checks", {})}
+    if not gov.get("required_checks"):
+        pending.append("world declares no required_checks — readiness is UNKNOWN, not READY")
+    if not gov.get("requires_approval_from"):
+        pending.append("world declares no requires_approval_from — nobody is named to approve")
     for name in gov.get("required_checks", []):
         c = checks.get(name)
         if c is None:
             pending.append(f"check '{name}' not run")
             continue
-        st, ev = c.get("status", "unknown"), c.get("evidence")
+        st, ev = norm_status(c), real_evidence(c.get("evidence"))
         if st == "fail":
             blocked.append(f"check '{name}' FAILING" + (f" ({ev})" if ev else ""))
-        elif st == "pass" and isinstance(ev, str) and ev.strip():
-            proof.append(f"VERIFIED {name}: {ev.strip()}")
+        elif st == "pass" and ev:
+            proof.append(f"VERIFIED {name}: {ev}")
         elif st == "pass":
-            pending.append(f"check '{name}' says pass but has no evidence — UNVERIFIED")
+            pending.append(f"check '{name}' says pass but has no real evidence — UNVERIFIED")
         else:
             pending.append(f"check '{name}' status '{st}'")
 
@@ -199,6 +259,7 @@ def eval_patch(p, W, deps, rdeps, cyclic, upstream_status):
 
 
 def evaluate(worlds, patches):
+    validate(worlds, patches)
     ids = [w.get("id") for w in worlds]
     missing_ids = [i for i, wid in enumerate(ids) if not isinstance(wid, str) or not wid.strip()]
     if missing_ids:
@@ -302,13 +363,13 @@ def world_posture(E):
             if c is None:
                 unverified.append(f"check '{name}' has no recorded result")
                 continue
-            st, ev = c.get("status", "unknown"), c.get("evidence")
+            st, ev = norm_status(c), real_evidence(c.get("evidence"))
             if st == "fail":
                 blocked.append(f"check '{name}' FAILING" + (f" ({ev})" if ev else ""))
-            elif st == "pass" and isinstance(ev, str) and ev.strip():
-                proof.append(f"VERIFIED {name}: {ev.strip()}")
+            elif st == "pass" and ev:
+                proof.append(f"VERIFIED {name}: {ev}")
             elif st == "pass":
-                unverified.append(f"check '{name}' says pass but has no evidence")
+                unverified.append(f"check '{name}' says pass but has no real evidence")
             else:
                 unverified.append(f"check '{name}' status '{st}'")
         for field in ("owner", "merge_policy", "requires_approval_from"):
@@ -318,6 +379,9 @@ def world_posture(E):
             unknown.append(f"public_surface not declared but {', '.join(sorted(rdeps[wid]))} depend on it")
         if not w.get("repo"):
             unknown.append("repo not declared")
+        ghost = [d for d in w.get("depends_on", []) if d not in W]
+        if ghost:
+            unknown.append(f"depends on undeclared world(s): {', '.join(ghost)} — upstream health cannot be checked")
         if gov.get("frozen"):
             status = "FROZEN"
         elif blocked:
@@ -334,6 +398,7 @@ def world_posture(E):
                         merge_policy=gov.get("merge_policy"), owner=gov.get("owner"))
     for wid, r in out.items():
         bad = [u for u in r["upstream"] if out.get(u, {}).get("status") in ("BLOCKED", "UNVERIFIED", "UNKNOWN", "AT_RISK")]
+        bad += [d for d in W[wid].get("depends_on", []) if d not in W]
         r["upstream_risk"] = bad
         if bad and r["status"] in ("HEALTHY", "UNVERIFIED", "UNKNOWN"):
             r["status"] = "AT_RISK"
@@ -421,7 +486,9 @@ def main():
             wdoc = json.load(f)
     except (OSError, json.JSONDecodeError) as e:
         ap.error(f"cannot read worlds file: {e}")
-    worlds = wdoc["worlds"] if isinstance(wdoc, dict) else wdoc
+    worlds = wdoc.get("worlds") if isinstance(wdoc, dict) else wdoc
+    if not isinstance(worlds, list) or not all(isinstance(w, dict) for w in worlds):
+        ap.error("worlds must be a JSON array of objects (or an object with a 'worlds' array)")
     if a.scan_docs:
         print(scan_docs(worlds))
         return
@@ -432,7 +499,7 @@ def main():
                 pdoc = json.load(f)
         except (OSError, json.JSONDecodeError) as e:
             ap.error(f"cannot read patches file: {e}")
-        patches = pdoc["patches"] if isinstance(pdoc, dict) else pdoc
+        patches = pdoc.get("patches") if isinstance(pdoc, dict) else pdoc
 
     if not isinstance(worlds, list) or not all(isinstance(w, dict) for w in worlds):
         ap.error("worlds must be a JSON array of objects (or an object with a 'worlds' array)")

@@ -12,7 +12,7 @@ metadata:
 
 This skill is the law layer. It does not replace your task skills (repair, build, review, deploy); they run *under* it. Where a task skill and this contract disagree, this contract wins unless the repo's own agent docs are stricter.
 
-Companion tools in this package: `gate/worlds_gate.py` (governance + readiness from `worlds.json`), `shield/` (edge defense), `scripts/receipts_check.py` (receipt chain).
+Companion tools in this package: `gate/worlds_gate.py` (governance + readiness from `worlds.json`), `shield/` (edge defense), `scripts/receipts_check.py` (receipt chain), `scripts/preflight.py` (ULTRATHINK / DEVIL decision gate — see `modes/ultrathink-devil.md`).
 
 ## Boot (every session, before any write)
 
@@ -44,6 +44,8 @@ Companion tools in this package: `gate/worlds_gate.py` (governance + readiness f
 10. **Receipts the moment state changes**, checked by `scripts/receipts_check.py`. Cross-repo state → memory.
 
 ## Modes
+
+Before any consequential or irreversible action, fill a preflight (`examples/preflight.example.json`) and run `python3 scripts/preflight.py <file>`; only exit 0 (PROCEED) lets you act.
 
 `/goalfix` (default) · `/fixfast` · `/repair-verify-merge` · `/truthmode` · `/confess` · `ATTACK N` / `/redteam` (N is a ceiling) · `ULTRATHINK` · `/audit` · `/plan` · `/handoff` · `/stop` · `cont` / `loop` (reconcile receipt vs live source first). Behavior table in references/os.md.
 
