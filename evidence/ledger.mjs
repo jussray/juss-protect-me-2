@@ -127,6 +127,24 @@ export function invalidateIfStale(receipt, currentIdentity, observedAt) {
   });
 }
 
+// Receipts are history: for each (findingId, check) only the most recent one
+// decides. Ties at the same timestamp resolve to the worst state, so a newer
+// pass supersedes an old failure but a simultaneous failure is never hidden.
+const STATE_SEVERITY = { verified: 0, inferred: 1, unknown: 2, stale: 3, blocked: 4, failed: 5 };
+export function latestReceipts(receipts) {
+  const latest = new Map();
+  for (const receipt of receipts) {
+    const key = `${receipt.findingId}\u0000${receipt.check}`;
+    const prev = latest.get(key);
+    const t = Date.parse(receipt.observedAt);
+    const pt = prev ? Date.parse(prev.observedAt) : -Infinity;
+    if (!prev || t > pt || (t === pt && (STATE_SEVERITY[receipt.state] ?? 9) > (STATE_SEVERITY[prev.state] ?? 9))) {
+      latest.set(key, receipt);
+    }
+  }
+  return [...latest.values()];
+}
+
 export function canCandidateProceed(receipts, requiredChecks, currentIdentity) {
   assertEvidenceIdentity(currentIdentity);
   const seenIds = new Set();
@@ -135,7 +153,8 @@ export function canCandidateProceed(receipts, requiredChecks, currentIdentity) {
     if (seenIds.has(receipt.id)) throw new Error(`duplicate receipt id: ${receipt.id}`);
     seenIds.add(receipt.id);
   }
-  return requiredChecks.every((check) => receipts.some((receipt) => {
+  const current = latestReceipts(receipts);
+  return requiredChecks.every((check) => current.some((receipt) => {
     const freshness = evaluateStaleness(receipt, currentIdentity);
     return receipt.check === check && receipt.state === 'verified' && freshness.state !== 'stale';
   }));
@@ -143,7 +162,7 @@ export function canCandidateProceed(receipts, requiredChecks, currentIdentity) {
 
 export function isGovernedActionEligible({ receipts, requiredChecks, currentIdentity, authorization }) {
   if (!canCandidateProceed(receipts, requiredChecks, currentIdentity)) return false;
-  if (receipts.some((receipt) => {
+  if (latestReceipts(receipts).some((receipt) => {
     const freshness = evaluateStaleness(receipt, currentIdentity);
     return freshness.state === 'stale' || ['failed', 'blocked', 'unknown'].includes(receipt.state);
   })) return false;
