@@ -155,3 +155,35 @@ test('unauthenticated Shield digest remains inferred', () => {
   const r = shieldObservationToReceipt(observation, identity, '2026-10-05T18:00:00.000Z');
   assert.equal(r.state, 'inferred');
 });
+
+const approval = () => ({
+  kind: 'founder_approval',
+  approvalId: 'APPROVAL-001',
+  repository: identity.source.repository,
+  commitSha: identity.source.commitSha,
+});
+
+test('a newer pass supersedes an old failure for the same check (history is not deleted)', () => {
+  const receipts = [
+    receipt({ id: 'SEC-010', check: 'focused_test', state: 'failed', evidenceRefs: [], observedAt: '2026-10-05T17:00:00.000Z' }),
+    receipt({ id: 'SEC-011', check: 'focused_test', observedAt: '2026-10-05T18:00:00.000Z' }),
+  ];
+  assert.equal(isGovernedActionEligible({ receipts, requiredChecks: ['focused_test'], currentIdentity: identity, authorization: approval() }), true);
+});
+
+test('a newer failure overrides an older pass for the same check', () => {
+  const receipts = [
+    receipt({ id: 'SEC-020', check: 'focused_test', observedAt: '2026-10-05T17:00:00.000Z' }),
+    receipt({ id: 'SEC-021', check: 'focused_test', state: 'failed', evidenceRefs: [], observedAt: '2026-10-05T18:00:00.000Z' }),
+  ];
+  assert.equal(canCandidateProceed(receipts, ['focused_test'], identity), false);
+  assert.equal(isGovernedActionEligible({ receipts, requiredChecks: ['focused_test'], currentIdentity: identity, authorization: approval() }), false);
+});
+
+test('a simultaneous failure is never hidden by a simultaneous pass', () => {
+  const receipts = [
+    receipt({ id: 'SEC-030', check: 'focused_test' }),
+    receipt({ id: 'SEC-031', check: 'focused_test', state: 'failed', evidenceRefs: [] }),
+  ];
+  assert.equal(isGovernedActionEligible({ receipts, requiredChecks: ['focused_test'], currentIdentity: identity, authorization: approval() }), false);
+});
