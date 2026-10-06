@@ -1,19 +1,23 @@
 {
   "name": "protect-me",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
-  "description": "Protect Me — governance gate, edge shield, operating contract, identity-bound evidence ledger, and evidence-only hallways for founder-run software portfolios.",
+  "description": "Protect Me — governance gate, edge shield, intent-bound authority, evidence ledger, EXPAND hallways, and authorized active counter-pressure for founder-run software portfolios.",
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "exports": {
     "./shield": "./shield/shield.mjs",
     "./evidence": "./evidence/ledger.mjs",
-    "./hallway": "./hallway/protocol.mjs"
+    "./hallway": "./hallway/protocol.mjs",
+    "./authority": "./authority/intent.mjs",
+    "./counter-pressure": "./authority/counter-pressure.mjs"
   },
   "scripts": {
-    "test": "node --test shield/shield.test.mjs evidence/evidence-ledger.test.mjs hallway/protocol.test.mjs && python3 gate/test_worlds_gate.py && python3 contract/scripts/test_preflight.py",
+    "test": "node --test shield/shield.test.mjs evidence/evidence-ledger.test.mjs hallway/protocol.test.mjs authority/intent.test.mjs authority/counter-pressure.test.mjs && python3 gate/test_worlds_gate.py && python3 contract/scripts/test_preflight.py",
     "test:evidence": "node --test evidence/evidence-ledger.test.mjs",
     "test:hallway": "node --test hallway/protocol.test.mjs",
+    "test:authority": "node --test authority/intent.test.mjs",
+    "test:pressure": "node --test authority/counter-pressure.test.mjs",
     "e2e": "playwright test",
     "gate": "python3 gate/worlds_gate.py",
     "gate:example": "python3 gate/worlds_gate.py examples/worlds.example.json",
@@ -37,6 +41,10 @@
     "evidence/evidence-ledger.test.mjs",
     "hallway/protocol.mjs",
     "hallway/protocol.test.mjs",
+    "authority/intent.mjs",
+    "authority/intent.test.mjs",
+    "authority/counter-pressure.mjs",
+    "authority/counter-pressure.test.mjs",
     "e2e/shield.spec.mjs",
     "playwright.config.mjs",
     "examples/",
