@@ -37,6 +37,26 @@ const SIGNAL_PATTERNS = Object.freeze([
   ['prompt_leak_request', /\b(show|reveal|print|repeat)\b.{0,80}\b(system prompt|hidden prompt|developer instructions)\b/i],
 ]);
 
+const NEGATED_SECURITY_GUIDANCE = /\b(?:do not|don't|never|must not|should not|cannot|can't)\b(?:\s+\w+){0,3}\s*$/i;
+
+function signalText(content) {
+  return String(content ?? '')
+    .normalize('NFKC')
+    .replace(/[\u00ad\u200b-\u200d\u2060\ufeff]/g, '')
+    .replace(/\s+/g, ' ');
+}
+
+function hasUnnegatedMatch(pattern, content) {
+  const text = signalText(content);
+  const flags = pattern.flags.includes('g') ? pattern.flags : pattern.flags + 'g';
+  const globalPattern = new RegExp(pattern.source, flags);
+  for (const match of text.matchAll(globalPattern)) {
+    const prefix = text.slice(Math.max(0, (match.index ?? 0) - 48), match.index ?? 0);
+    if (!NEGATED_SECURITY_GUIDANCE.test(prefix)) return true;
+  }
+  return false;
+}
+
 const SIGNAL_WEIGHTS = Object.freeze({
   instruction_override: 0.35,
   role_impersonation: 0.25,
@@ -123,7 +143,7 @@ export async function validateArtifact(artifact) {
 
 export function classifyArtifact(artifact) {
   const signals = SIGNAL_PATTERNS
-    .filter(([, pattern]) => pattern.test(artifact.content))
+    .filter(([, pattern]) => hasUnnegatedMatch(pattern, artifact.content))
     .map(([signal]) => signal);
   const uniqueSignals = [...new Set(signals)];
   const score = Math.min(1, uniqueSignals.reduce((total, signal) => total + SIGNAL_WEIGHTS[signal], 0));
