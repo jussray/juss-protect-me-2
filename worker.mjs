@@ -21,7 +21,37 @@ const app = {
   },
 };
 
-export default createShield(app, {
+const shield = createShield(app, {
   service: 'juss-protect-me-2',
   rateLimit: { paths: ['/api', '/api/*'], retryAfterSeconds: 60 },
 });
+
+// Keep response hardening outside Shield so decoys, limiter failures,
+// API responses, and static assets receive the same security headers.
+const RESPONSE_HEADERS = Object.freeze({
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'Referrer-Policy': 'no-referrer',
+  'Strict-Transport-Security': 'max-age=31536000',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()',
+  'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'; upgrade-insecure-requests",
+});
+
+export default {
+  async fetch(request, env, ctx) {
+    const result = await shield.fetch(request, env, ctx);
+    const headers = new Headers(result.headers);
+    for (const [key, value] of Object.entries(RESPONSE_HEADERS)) {
+      headers.set(key, value);
+    }
+    const path = new URL(request.url).pathname;
+    if (path === '/api' || path.startsWith('/api/')) {
+      headers.set('Cache-Control', 'no-store');
+    }
+    return new Response(result.body, {
+      status: result.status,
+      statusText: result.statusText,
+      headers,
+    });
+  },
+};
