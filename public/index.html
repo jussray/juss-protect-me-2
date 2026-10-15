@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#070d1a">
+  <meta name="description" content="Juss Protect Me 2: security infrastructure with explicit authority, evidence, and rollback.">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; object-src 'none'; upgrade-insecure-requests">
+  <title>Juss Protect Me 2 | Guard the systems</title>
+  <style>
+    :root{color-scheme:dark;--bg:#070d1a;--ink:#f0f7ff;--dim:#b7c9df;--line:rgba(125,198,255,.23)}
+    *{box-sizing:border-box}html{scroll-behavior:smooth}
+    body{margin:0;font:16px/1.6 system-ui,-apple-system,Segoe UI,Arial,sans-serif;color:var(--ink);background:radial-gradient(ellipse at 75% 15%,#0d4060 0,transparent 44%),radial-gradient(ellipse at 13% 85%,#202047 0,transparent 40%),var(--bg);min-height:100vh}
+    a{color:inherit}a:focus-visible{outline:3px solid #a3ddff;outline-offset:4px}
+    .wrap{width:min(1100px,calc(100% - 40px));margin:auto}
+    header{border-bottom:1px solid var(--line)}
+    .top{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:82px}
+    .brand{font-weight:900;letter-spacing:.055em;font-size:16px}
+    .tag{font-size:12px;letter-spacing:.14em;color:#93d5f8;font-weight:800}
+    main{padding:76px 0}
+    .eyebrow{font-size:12px;letter-spacing:.2em;text-transform:uppercase;font-weight:850;color:#87dafa}
+    h1{font-size:clamp(45px,8vw,91px);line-height:1.05;letter-spacing:-.06em;margin:19px 0 22px;max-width:960px}
+    h1 em{font-style:normal;color:#86dffd}
+    .lead{font-size:clamp(18px,2.3vw,23px);color:#d3deee;max-width:750px}
+    .pill{display:inline-block;border:1px solid #346a84;border-radius:99px;padding:6px 12px;color:#b1e4ff;font-size:13px;font-weight:750;letter-spacing:.06em;margin:20px 0 12px}
+    .button{display:inline-block;text-decoration:none;border-radius:12px;background:linear-gradient(100deg,#9fe8ff,#9b9cfe);color:#0a1130;font-weight:850;padding:12px 20px;margin:16px 0}
+    h2{font-size:clamp(27px,4vw,39px);letter-spacing:-.045em;margin:75px 0 6px}
+    .intro{color:var(--dim);max-width:800px}
+    .cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:17px;margin-top:24px}
+    article{background:rgba(9,24,46,.82);border:1px solid var(--line);border-radius:18px;padding:26px}
+    article b{color:#87dafa;font-size:13px;letter-spacing:.1em}
+    article h3{font-size:21px;margin:12px 0 8px}
+    article p{color:var(--dim);margin:0}
+    .notice{border-left:3px solid #80d7ff;background:rgba(28,84,119,.19);padding:20px 24px;border-radius:0 13px 13px 0;margin-top:40px;max-width:875px;color:#d4e5f3}
+    footer{border-top:1px solid var(--line);padding:24px 0 38px;color:var(--dim);font-size:14px}
+    @media(max-width:700px){main{padding-top:50px}.top{min-height:72px}.tag{max-width:110px;text-align:right}.cards{grid-template-columns:1fr}h2{margin-top:55px}}
+    @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+  </style>
+</head>
+<body>
+  <header><div class="wrap top"><div class="brand">⬡ JUSS PROTECT ME 2</div><span class="tag">JUSS &amp; CO. · MODEL TWO</span></div></header>
+  <main class="wrap">
+    <section aria-labelledby="hero">
+      <p class="eyebrow">For software systems, not personal devices</p>
+      <h1 id="hero">Guard the systems. <em>Keep the authority.</em></h1>
+      <p class="lead">Security controls for infrastructure, agents, and software delivery. Designed to distinguish threats, evidence, recommendations, and permission to act.</p>
+      <p class="pill">Live edge shield on this Worker</p>
+      <p><a class="button" href="#capabilities">See what's inside</a></p>
+      <div class="notice"><strong>Scope matters.</strong> This deployment applies its Shield to its own routes. It does not automatically secure other websites, repos, pipelines, or Cloudflare Workers. Those systems require explicit integration and verification.</div>
+    </section>
+    <section id="capabilities" aria-labelledby="capabilities-title">
+      <h2 id="capabilities-title">Three coordinated systems</h2>
+      <p class="intro">Separate responsibilities, one rule: protection must be provable and authority cannot be self-granted.</p>
+      <div class="cards">
+        <article><b>GATE</b><h3>See delivery risk.</h3><p>Maps dependencies, approvals, checks, and evidence gaps without inventing a green state or merging autonomously.</p></article>
+        <article><b>SHIELD</b><h3>Defend the edge.</h3><p>Filters suspicious requests, uses a bound rate limiter for API paths, and emits evidence without logging raw client IPs.</p></article>
+        <article><b>CONTRACT</b><h3>Keep agents governed.</h3><p>Defines permission, review, rollback, and proof rules for AI-assisted software changes.</p></article>
+      </div>
+    </section>
+    <section aria-labelledby="status-title">
+      <h2 id="status-title">Verification over claims</h2>
+      <p class="intro">The Shield on this site is a real Cloudflare Worker integration. Any future claim that your other systems are protected requires independent runtime evidence for each target.</p>
+    </section>
+  </main>
+  <footer><div class="wrap">© Juss &amp; Co. · Protect Me 2 · Software and infrastructure defense</div></footer>
+</body>
+</html>
