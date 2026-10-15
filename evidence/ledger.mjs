@@ -1,3 +1,5 @@
+import { assertPrivateContentAbsent } from './privacy.mjs';
+
 const FULL_SHA = /^[0-9a-f]{40}$/i;
 const SHA256 = /^[0-9a-f]{64}$/i;
 const STABLE_ID = /^[A-Z][A-Z0-9_-]{2,127}$/;
@@ -61,7 +63,9 @@ export function assertEvidenceReceipt(receipt) {
   if (!String(receipt?.summary ?? '').trim()) throw new Error('receipt.summary is required');
   assertIso(receipt.observedAt, 'receipt.observedAt');
   assertEvidenceIdentity(receipt.identity);
-  if (!Array.isArray(receipt.evidenceRefs)) throw new Error('receipt.evidenceRefs must be an array');
+  if (!Array.isArray(receipt.evidenceRefs) || !receipt.evidenceRefs.every((ref) => typeof ref === 'string' && ref.trim())) {
+    throw new Error('receipt.evidenceRefs must contain only non-empty strings');
+  }
   if (receipt.state === 'verified' && receipt.evidenceRefs.length === 0) {
     throw new Error('verified receipts require at least one evidence reference');
   }
@@ -71,6 +75,7 @@ export function assertEvidenceReceipt(receipt) {
   if (receipt.authority?.level !== 'evidence_only' || receipt.authority?.canAuthorize !== false) {
     throw new Error('security evidence cannot self-authorize');
   }
+  assertPrivateContentAbsent(receipt);
 }
 
 export function createEvidenceReceipt({

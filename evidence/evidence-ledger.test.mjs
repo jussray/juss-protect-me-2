@@ -187,3 +187,15 @@ test('a simultaneous failure is never hidden by a simultaneous pass', () => {
   ];
   assert.equal(isGovernedActionEligible({ receipts, requiredChecks: ['focused_test'], currentIdentity: identity, authorization: approval() }), false);
 });
+
+
+test('privacy guard rejects raw conversation content and unsafe references in receipts', () => {
+  for (const summary of ['user: private conversation\nassistant: response', 'member@example.org', '"role":"assistant"']) {
+    assert.throws(() => receipt({ summary }), /private (?:conversation )?content is forbidden in evidence/);
+  }
+  assert.throws(() => receipt({ evidenceRefs: ['api_key=do-not-log-this'] }), /private content is forbidden in evidence/);
+  assert.throws(() => receipt({ evidenceRefs: [{ role: 'user', content: 'private' }] }), /must contain only non-empty strings/);
+  assert.throws(() => receipt({ identity: {
+    ...identity, runtime: { ...identity.runtime, metadata: { cookie: 'do-not-log' } },
+  } }), /raw sensitive field is forbidden in evidence/);
+});
