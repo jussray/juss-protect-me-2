@@ -199,3 +199,19 @@ test('privacy guard rejects raw conversation content and unsafe references in re
     ...identity, runtime: { ...identity.runtime, metadata: { cookie: 'do-not-log' } },
   } }), /raw sensitive field is forbidden in evidence/);
 });
+
+
+test('redteam evidence aliases and transcript keys never reach receipts', () => {
+  const sensitiveFieldNames = ['client_secret', 'private_key', 'accessToken', 'refresh_token', 'api_key', 'set_cookie', 'chat_history'];
+  const sensitiveStrings = [
+    'client_secret=SYNTHETIC_SECRET_VALUE',
+    'private_key=SYNTHETIC_SECRET_VALUE',
+    'set-cookie: session=sampletoken123',
+  ];
+  for (const field of sensitiveFieldNames) {
+    assert.throws(() => ({metadata,summary}) => receipt({...metadata?{identity:{...identity,runtime:{...identity.runtime,metadata}}}:{},...summary?{summary}:{}})({ metadata: { [field]: 'SYNTHETIC_VALUE' } }), /sensitive|private/);
+  }
+  for (const summary of sensitiveStrings) {
+    assert.throws(() => ({metadata,summary}) => receipt({...metadata?{identity:{...identity,runtime:{...identity.runtime,metadata}}}:{},...summary?{summary}:{}})({ summary }), /private content is forbidden/);
+  }
+});
