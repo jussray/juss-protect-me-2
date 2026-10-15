@@ -47,6 +47,14 @@ export function calculatePressure({
   return Object.freeze({ score, level: PRESSURE_LEVELS[index], pushes: p });
 }
 
+// A bare {authorized: true} is not authority. Only a record produced by the
+// intent gate (authority/intent.mjs, state AUTHORIZED) carries the binding.
+function isIntentBound(auth) {
+  return auth.state === 'AUTHORIZED'
+    && typeof auth.intentId === 'string' && auth.intentId.trim() !== ''
+    && typeof auth.grantId === 'string' && auth.grantId.trim() !== '';
+}
+
 export function buildCounterPressurePlan({
   pressure,
   expansion,
@@ -64,7 +72,8 @@ export function buildCounterPressurePlan({
 
   for (const capability of requested) {
     const auth = authorizationByCapability[capability];
-    if (auth?.authorized === true) permitted.push(capability);
+    if (auth?.authorized === true && isIntentBound(auth)) permitted.push(capability);
+    else if (auth?.authorized === true) denied.push({ capability, reason: 'authorization_not_intent_bound' });
     else denied.push({ capability, reason: auth?.reasons?.[0] ?? 'missing_intent_authority' });
   }
 
@@ -84,7 +93,8 @@ export function buildCounterPressurePlan({
     activeCounterPressure: ownedBoundary === true ? active.filter((c) => ['active_challenge', 'adaptive_decoy', 'canary_activate', 'sinkhole_owned_route'].includes(c)) : [],
     denied,
     forbiddenRemoteRetaliation: FORBIDDEN,
-    state: ownedBoundary === true ? 'READY_WITHIN_AUTHORITY' : 'BOUNDARY_DENIED',
+    state: ownedBoundary === true ? 'PLAN_ONLY' : 'BOUNDARY_DENIED',
+    executes: false,
   });
 }
 

@@ -4,7 +4,8 @@ import test from 'node:test';
 import { buildCounterPressurePlan, calculatePressure, classifyTechnicalActor } from './counter-pressure.mjs';
 
 const expansion = { observationUnits: 48_777 };
-const yes = { authorized: true };
+// Authority records as produced by authorizeIntentAction (authority/intent.mjs).
+const yes = { authorized: true, state: 'AUTHORIZED', intentId: 'INTENT_OWNED_BOUNDARY', grantId: 'GRANT_OWNED_BOUNDARY' };
 const no = { authorized: false, reasons: ['action_outside_intent'] };
 
 test('pressure rises as attacker pushes and evidence converges', () => {
@@ -57,6 +58,22 @@ test('counter-pressure cannot leave the owned boundary', () => {
   assert.equal(plan.state, 'BOUNDARY_DENIED');
   assert.deepEqual(plan.activeCounterPressure, []);
   assert.equal(plan.forbiddenRemoteRetaliation.includes('exploit_remote_host'), true);
+});
+
+test('a bare authorized flag is not authority: no active capability and the plan never claims READY', () => {
+  const plan = buildCounterPressurePlan({
+    pressure: { level: 'LOCKDOWN' },
+    expansion,
+    authorizationByCapability: Object.fromEntries([
+      'observe', 'classify', 'rate_limit', 'active_challenge', 'adaptive_decoy', 'canary_activate',
+      'block_session', 'isolate_session', 'rotate_session_keys', 'sinkhole_owned_route',
+    ].map((x) => [x, { authorized: true }])),
+    ownedBoundary: true,
+  });
+  assert.deepEqual(plan.activeCounterPressure, []);
+  assert.equal(plan.denied.every((x) => x.reason === 'authorization_not_intent_bound'), true);
+  assert.equal(plan.state, 'PLAN_ONLY');
+  assert.equal(plan.executes, false);
 });
 
 test('identification distinguishes technical actor class without inventing a real-world identity', () => {
