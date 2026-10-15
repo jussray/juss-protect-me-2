@@ -13,7 +13,7 @@
     "./counter-pressure": "./authority/counter-pressure.mjs"
   },
   "scripts": {
-    "test": "node --test shield/shield.test.mjs evidence/evidence-ledger.test.mjs hallway/protocol.test.mjs authority/intent.test.mjs authority/counter-pressure.test.mjs && python3 gate/test_worlds_gate.py && python3 contract/scripts/test_preflight.py",
+    "test": "node --test shield/shield.test.mjs evidence/evidence-ledger.test.mjs hallway/protocol.test.mjs authority/intent.test.mjs authority/counter-pressure.test.mjs && python3 gate/test_worlds_gate.py && python3 contract/scripts/test_preflight.py && node --test mcp/protocol.test.mjs",
     "test:evidence": "node --test evidence/evidence-ledger.test.mjs",
     "test:hallway": "node --test hallway/protocol.test.mjs",
     "test:authority": "node --test authority/intent.test.mjs",
@@ -21,7 +21,8 @@
     "e2e": "playwright test",
     "gate": "python3 gate/worlds_gate.py",
     "gate:example": "python3 gate/worlds_gate.py examples/worlds.example.json",
-    "package": "npm pack"
+    "package": "npm pack",
+    "test:mcp": "node --test mcp/protocol.test.mjs"
   },
   "engines": {
     "node": ">=20"
@@ -56,6 +57,10 @@
     "contract/scripts/",
     "shield/example/worker.mjs",
     "shield/example/wrangler.jsonc",
-    "shield/example/public/index.html"
+    "shield/example/public/index.html",
+    "mcp/protocol.mjs",
+    "mcp/tools.mjs",
+    "mcp/worker.mjs",
+    "wrangler.mcp.jsonc"
   ]
 }
