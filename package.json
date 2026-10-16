@@ -13,7 +13,7 @@
     "./counter-pressure": "./authority/counter-pressure.mjs"
   },
   "scripts": {
-    "test": "node --test shield/shield.test.mjs evidence/evidence-ledger.test.mjs hallway/protocol.test.mjs authority/intent.test.mjs authority/counter-pressure.test.mjs && python3 gate/test_worlds_gate.py && python3 contract/scripts/test_preflight.py && node --test mcp/protocol.test.mjs && node --test mcp/worker.test.mjs",
+    "test": "node --test shield/shield.test.mjs evidence/evidence-ledger.test.mjs hallway/protocol.test.mjs authority/intent.test.mjs authority/counter-pressure.test.mjs && python3 gate/test_worlds_gate.py && python3 contract/scripts/test_preflight.py && node --test mcp/protocol.test.mjs && node --test mcp/worker.test.mjs && node --test mcp/oauth.test.mjs",
     "test:evidence": "node --test evidence/evidence-ledger.test.mjs",
     "test:hallway": "node --test hallway/protocol.test.mjs",
     "test:authority": "node --test authority/intent.test.mjs",
@@ -23,7 +23,8 @@
     "gate:example": "python3 gate/worlds_gate.py examples/worlds.example.json",
     "package": "npm pack",
     "test:mcp": "node --test mcp/protocol.test.mjs",
-    "test:mcp:worker": "node --test mcp/worker.test.mjs"
+    "test:mcp:worker": "node --test mcp/worker.test.mjs",
+    "test:mcp:oauth": "node --test mcp/oauth.test.mjs"
   },
   "engines": {
     "node": ">=20"
