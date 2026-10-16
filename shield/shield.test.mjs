@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  classify, createShield, matchPath, nodeRequestInput, rateLimit, resolveConfig, verifyReceipt,
+  classify, createShield, matchPath, nodeRequestInput, observationForTelemetry, rateLimit, resolveConfig, verifyReceipt,
 } from './shield.mjs';
 
 const upstream = { fetch: async () => new Response('app', { status: 200 }) };
@@ -144,4 +144,27 @@ test('malformed config is rejected at startup, not on every request', () => {
   assert.throws(() => createShield(upstream, { rateLimit: { paths: '/api/*' } }), /rateLimit.paths/);
   assert.throws(() => createShield(upstream, { probePaths: ['admin'] }), /probePaths/);
   assert.throws(() => createShield(upstream, { rateLimit: { retryAfterSeconds: 0 } }), /retryAfterSeconds/);
+});
+
+test('telemetry redacts hostile paths and user agents while preserving verifiable HMAC evidence', async () => {
+  const secret = 'private-test-key-not-a-live-secret';
+  const privatePath = '/reset/my-private-conversation-token';
+  const privateAgent = 'some-client private-session-marker-987';
+  const original = await classify({
+    method: 'GET',
+    url: privatePath,
+    userAgent: privateAgent,
+    sourceIp: '203.0.113.20',
+  }, undefined, secret);
+  const sanitized = await observationForTelemetry(original, secret);
+  const printed = JSON.stringify(sanitized);
+  assert.equal(printed.includes('my-private-conversation-token'), false);
+  assert.equal(printed.includes('private-session-marker-987'), false);
+  assert.equal(printed.includes('203.0.113.20'), false);
+  assert.equal(sanitized.event.pathname, '[redacted]');
+  assert.equal(sanitized.event.identity.userAgent, null);
+  assert.equal(sanitized.receiptKind, 'hmac-sha256');
+  assert.equal(await verifyReceipt(sanitized, secret), true);
+  assert.equal(await verifyReceipt(sanitized, 'wrong-key'), false);
+  assert.equal(original.event.pathname, privatePath);
 });

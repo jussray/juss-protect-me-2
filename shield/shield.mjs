@@ -236,6 +236,38 @@ export async function rateLimit(request, env, config = DEFAULTS) {
     { 'retry-after': String(cfg.rateLimit.retryAfterSeconds) });
 }
 
+/**
+ * Diagnostic logs must not include attacker-controlled URL paths or User-Agent
+ * strings. Preserve a separately signed evidence-only receipt for the sanitized
+ * event so logging cannot silently upgrade an untrusted claim to authority.
+ */
+export async function observationForTelemetry(observation, secret = null) {
+  const event = observation?.event ?? {};
+  const identity = event.identity ?? {};
+  const sanitized = {
+    schema: 'protect-me/shield-event@v1',
+    service: String(event.service ?? 'unknown'),
+    method: /^[A-Z]{1,12}$/.test(event.method ?? '') ? event.method : 'OTHER',
+    pathname: '[redacted]',
+    verdict: event.verdict ?? 'CLASSIFY_ERROR',
+    identity: {
+      actor: identity.actor ?? null,
+      asn: identity.asn ?? null,
+      country: identity.country ?? null,
+      userAgent: null,
+      claimedCrawler: identity.claimedCrawler ?? null,
+      verifiedBot: identity.verifiedBot === true,
+      botScore: identity.botScore ?? null,
+    },
+  };
+  return Object.freeze({
+    event: sanitized,
+    checks: observation?.checks ?? [],
+    notable: observation?.notable === true,
+    ...(await receiptFor(sanitized, secret)),
+  });
+}
+
 export function decoyResponse() {
   return jsonResponse(404, { error: 'not_found' });
 }
@@ -264,7 +296,9 @@ export function createShield(upstream, config = {}) {
         cf: request.cf,
       }, cfg, secret);
       if (cfg.telemetry && observation.notable) {
-        const line = Promise.resolve().then(() => console.log('[protect-me-shield]', JSON.stringify(observation)));
+        const line = observationForTelemetry(observation, secret)
+          .then((safe) => console.log('[protect-me-shield]', JSON.stringify(safe)))
+          .catch(() => console.log('[protect-me-shield]', '{"event":{"verdict":"TELEMETRY_ERROR"}}'));
         if (ctx?.waitUntil) ctx.waitUntil(line);
       }
       if (observation.event.verdict === 'PROBE') return decoyResponse();
