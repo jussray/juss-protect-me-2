@@ -1,12 +1,12 @@
 import { test, expect } from '@playwright/test';
 
-test('Model Two public front door is usable and not a claim of external protection', async ({ page }) => {
+test('Model Two public welcome page shows value without implementation details', async ({ page }) => {
   await page.goto('/');
-  await expect(page).toHaveTitle('Juss Protect Me 2 | Guard the systems');
-  await expect(page.getByRole('heading', { name: /Guard the systems/ })).toBeVisible();
-  await page.getByRole('link', { name: "See what's inside" }).click();
-  await expect(page.getByRole('heading', { name: 'Three coordinated systems' })).toBeVisible();
-  await expect(page.getByText(/does not automatically secure other websites/)).toBeVisible();
+  await expect(page).toHaveTitle('Juss Protect Me 2 | Confidence for what\'s next');
+  await expect(page.getByRole('heading', { name: /Imagine more/ })).toBeVisible();
+  await page.getByRole('link', { name: 'Explore the vision' }).click();
+  await expect(page.getByRole('heading', { name: 'Bold ideas deserve a stronger foundation.' })).toBeVisible();
+  await expect(page.getByText(/other products are not automatically covered/)).toBeVisible();
 });
 
 test('production Shield reports only its own deployment scope', async ({ request }) => {
