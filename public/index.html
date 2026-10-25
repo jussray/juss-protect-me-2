@@ -1,67 +1,66 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#070d1a">
-  <meta name="description" content="Juss Protect Me 2: security infrastructure with explicit authority, evidence, and rollback.">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; object-src 'none'; upgrade-insecure-requests">
-  <title>Juss Protect Me 2 | Guard the systems</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#070609" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; object-src 'none'; upgrade-insecure-requests" />
+  <meta name="description" content="Juss & Co. protection for people, devices, everyday life, and smarter AI. Explore Juss Protect Me and Juss Protect Me 2 early access." />
+  <title>Juss & Co. | Protection That Empowers</title>
   <style>
-    :root{color-scheme:dark;--bg:#070d1a;--ink:#f0f7ff;--dim:#b7c9df;--line:rgba(125,198,255,.23)}
-    *{box-sizing:border-box}html{scroll-behavior:smooth}
-    body{margin:0;font:16px/1.6 system-ui,-apple-system,Segoe UI,Arial,sans-serif;color:var(--ink);background:radial-gradient(ellipse at 75% 15%,#0d4060 0,transparent 44%),radial-gradient(ellipse at 13% 85%,#202047 0,transparent 40%),var(--bg);min-height:100vh}
-    a{color:inherit}a:focus-visible{outline:3px solid #a3ddff;outline-offset:4px}
-    .wrap{width:min(1100px,calc(100% - 40px));margin:auto}
-    header{border-bottom:1px solid var(--line)}
-    .top{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:82px}
-    .brand{font-weight:900;letter-spacing:.055em;font-size:16px}
-    .tag{font-size:12px;letter-spacing:.14em;color:#93d5f8;font-weight:800}
-    main{padding:76px 0}
-    .eyebrow{font-size:12px;letter-spacing:.2em;text-transform:uppercase;font-weight:850;color:#87dafa}
-    h1{font-size:clamp(45px,8vw,91px);line-height:1.05;letter-spacing:-.06em;margin:19px 0 22px;max-width:960px}
-    h1 em{font-style:normal;color:#86dffd}
-    .lead{font-size:clamp(18px,2.3vw,23px);color:#d3deee;max-width:750px}
-    .pill{display:inline-block;border:1px solid #346a84;border-radius:99px;padding:6px 12px;color:#b1e4ff;font-size:13px;font-weight:750;letter-spacing:.06em;margin:20px 0 12px}
-    .button{display:inline-block;text-decoration:none;border-radius:12px;background:linear-gradient(100deg,#9fe8ff,#9b9cfe);color:#0a1130;font-weight:850;padding:12px 20px;margin:16px 0}
-    h2{font-size:clamp(27px,4vw,39px);letter-spacing:-.045em;margin:75px 0 6px}
-    .intro{color:var(--dim);max-width:800px}
-    .cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:17px;margin-top:24px}
-    article{background:rgba(9,24,46,.82);border:1px solid var(--line);border-radius:18px;padding:26px}
-    article b{color:#87dafa;font-size:13px;letter-spacing:.1em}
-    article h3{font-size:21px;margin:12px 0 8px}
-    article p{color:var(--dim);margin:0}
-    .notice{border-left:3px solid #80d7ff;background:rgba(28,84,119,.19);padding:20px 24px;border-radius:0 13px 13px 0;margin-top:40px;max-width:875px;color:#d4e5f3}
-    footer{border-top:1px solid var(--line);padding:24px 0 38px;color:var(--dim);font-size:14px}
-    @media(max-width:700px){main{padding-top:50px}.top{min-height:72px}.tag{max-width:110px;text-align:right}.cards{grid-template-columns:1fr}h2{margin-top:55px}}
+    :root{color-scheme:dark;--gold:#f1bd59;--cream:#f8e5bd;--violet:#c653fa;--ink:#080609;--muted:#d2c9d8}
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#050408;color:white;font:16px/1.55 system-ui,-apple-system,'Segoe UI',Arial,sans-serif}a{color:inherit}a:focus-visible,button:focus-visible{outline:3px solid #f7d280;outline-offset:4px}
+    .desktop-view{display:block;position:relative;width:100%;max-width:1920px;margin:0 auto;line-height:0}
+    .approved-art{width:100%;height:auto;display:block;aspect-ratio:3/2;object-fit:contain}
+    .hotspot{position:absolute;display:block;line-height:1.2;border-radius:8px;color:transparent;text-decoration:none;z-index:2;overflow:hidden;text-indent:-100vw}
+    .hotspot:focus-visible{outline:3px solid #fff;outline-offset:2px;background:#fff2;text-indent:0;color:white;text-shadow:0 1px 5px #000;font-size:clamp(10px,1.1vw,16px);display:grid;place-items:center}
+    .nav-home{left:27.2%;top:0%;width:6.2%;height:6%}.nav-products{left:33.8%;top:0%;width:6.5%;height:6%}.nav-purpose{left:41%;top:0%;width:8.5%;height:6%}.nav-support{left:49.7%;top:0%;width:6.7%;height:6%}.nav-access{left:57.1%;top:0%;width:13%;height:6%}
+    .cta-one{left:3%;top:42.4%;width:13.9%;height:5.7%}.how-one{left:18%;top:42.4%;width:12.2%;height:5.7%}.cta-two{left:52.8%;top:42.4%;width:14.5%;height:5.7%}.how-two{left:68.5%;top:42.4%;width:13.3%;height:5.7%}
+    .footer-access{left:86%;top:91%;width:12.5%;height:5.3%}
+    .mobile-view{display:none}.below{background:linear-gradient(135deg,#10090a 0%,#05040b 45%,#120521 100%);border-top:1px solid #b8894b66;padding:48px max(6vw,20px);text-align:center}.below h2{font-family:Georgia,'Times New Roman',serif;color:var(--cream);font-size:clamp(30px,4.5vw,46px);font-weight:400;margin:0 0 12px}.below p{max-width:720px;color:var(--muted);margin:0 auto 22px}.links{display:flex;justify-content:center;flex-wrap:wrap;gap:14px}.button{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;border:1px solid #d2ab69;border-radius:999px;padding:13px 22px;color:#1b0c06;background:linear-gradient(110deg,#f2c765,#df9a31);font-size:15px;font-weight:700;min-height:48px}.button.violet{color:#fff;border-color:#b664f9;background:linear-gradient(110deg,#773bf7,#c044df)}.button.ghost{color:var(--cream);background:transparent}.disclaimer{font-size:13px;color:#a8a0aa;margin-top:22px!important}
+    .value-row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;color:#d8b775;letter-spacing:.11em;text-transform:uppercase;font-size:11px;margin-top:22px}
+    @media(max-width:740px){
+      .desktop-view{display:none}.mobile-view{display:block}
+      .mobile-top{display:flex;justify-content:space-between;align-items:center;padding:17px 18px;background:#050407;border-bottom:1px solid #a873334d;gap:8px}
+      .mobile-top strong{font:30px/1 Georgia,'Times New Roman',serif;color:var(--cream);font-weight:400;white-space:nowrap}.mobile-top span{font-size:8px;letter-spacing:.16em;text-transform:uppercase;color:#e0d2d5;text-align:right}
+      .mobile-panel{margin:0;background:#090508;border-bottom:1px solid #b4884855}.mobile-panel.two{background:#070410}
+      .image-half{position:relative;overflow:hidden;width:100%;aspect-ratio:768 / 690;background:#000}.image-half img{position:absolute;display:block;width:200%;max-width:none;height:auto;top:-9.5%}.image-half.one img{left:0}.image-half.two img{right:0}
+      .mobile-content{padding:17px 20px 31px;margin-top:-5px}.mobile-content .eyebrow{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#ebbf6b;margin:0 0 8px}.mobile-content h1,.mobile-content h2{font:clamp(31px,9vw,45px)/1.1 Georgia,'Times New Roman',serif;margin:0 0 12px}.mobile-content .two-title{color:#e3b3fa}.mobile-content p{color:#d6cfd7;margin:0 0 20px}.mobile-content .buttons{display:flex;gap:10px;flex-wrap:wrap}
+      .feature-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:22px 0 0}.feature{border:1px solid #aa834452;border-radius:12px;padding:13px 11px;background:#1b1009}.two .feature{background:#140b21;border-color:#a360e566}.feature strong{font-size:13px;display:block;color:#f1d29c}.two .feature strong{color:#e9c5ff}.feature span{display:block;font-size:11px;color:#d1c8cf;margin-top:5px}
+      .below{padding:38px 18px 45px}.below h2{font-size:31px}.below .links{flex-direction:column;align-items:stretch}.below .button{width:100%}
+    }
     @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
   </style>
 </head>
 <body>
-  <header><div class="wrap top"><div class="brand">⬡ JUSS PROTECT ME 2</div><span class="tag">JUSS &amp; CO. · MODEL TWO</span></div></header>
-  <main class="wrap">
-    <section aria-labelledby="hero">
-      <p class="eyebrow">For software systems, not personal devices</p>
-      <h1 id="hero">Guard the systems. <em>Keep the authority.</em></h1>
-      <p class="lead">Security controls for infrastructure, agents, and software delivery. Designed to distinguish threats, evidence, recommendations, and permission to act.</p>
-      <p class="pill">Live edge shield on this Worker</p>
-      <p><a class="button" href="#capabilities">See what's inside</a></p>
-      <div class="notice"><strong>Scope matters.</strong> This deployment applies its Shield to its own routes. It does not automatically secure other websites, repos, pipelines, or Cloudflare Workers. Those systems require explicit integration and verification.</div>
+  <!-- Faithful view of the founder-approved 2026-10-25 artwork, including exact portraits, wording, and layout. -->
+  <main id="home">
+    <section class="desktop-view" aria-label="Juss & Co. model one and model two protection overview">
+      <img class="approved-art" src="./visual.webp" width="1536" height="1024" decoding="async" fetchpriority="high" alt="Juss & Co. presents Juss Protect Me for people, devices and everyday safety in warm gold, alongside Juss Protect Me 2 for AI agents, tools and trusted boundaries in violet. A people-first black-and-gold protection collection with early-access invitations." />
+      <a class="hotspot nav-home" href="#home">Home</a><a class="hotspot nav-products" href="#products">Products</a><a class="hotspot nav-purpose" href="#purpose">Our Purpose</a><a class="hotspot nav-support" href="#support">Support</a><a class="hotspot nav-access" href="#early-access">Get Early Access</a>
+      <a class="hotspot cta-one" href="#early-access">Explore Model One Early Access</a><a class="hotspot how-one" href="#how-it-works">How Model One Works</a>
+      <a class="hotspot cta-two" href="#early-access">Explore Model Two Early Access</a><a class="hotspot how-two" href="#how-it-works">How Model Two Works</a>
+      <a class="hotspot footer-access" href="#early-access">Explore Early Access</a>
     </section>
-    <section id="capabilities" aria-labelledby="capabilities-title">
-      <h2 id="capabilities-title">Three coordinated systems</h2>
-      <p class="intro">Separate responsibilities, one rule: protection must be provable and authority cannot be self-granted.</p>
-      <div class="cards">
-        <article><b>GATE</b><h3>See delivery risk.</h3><p>Maps dependencies, approvals, checks, and evidence gaps without inventing a green state or merging autonomously.</p></article>
-        <article><b>SHIELD</b><h3>Defend the edge.</h3><p>Filters suspicious requests, uses a bound rate limiter for API paths, and emits evidence without logging raw client IPs.</p></article>
-        <article><b>CONTRACT</b><h3>Keep agents governed.</h3><p>Defines permission, review, rollback, and proof rules for AI-assisted software changes.</p></article>
-      </div>
-    </section>
-    <section aria-labelledby="status-title">
-      <h2 id="status-title">Verification over claims</h2>
-      <p class="intro">The Shield on this site is a real Cloudflare Worker integration. Any future claim that your other systems are protected requires independent runtime evidence for each target.</p>
-    </section>
+    <div class="mobile-view" id="products">
+      <header class="mobile-top"><strong>JUSS &amp; CO.</strong><span>Real People<br>Real Intelligence<br>A Safer Tomorrow</span></header>
+      <article class="mobile-panel one" aria-labelledby="one-heading">
+        <div class="image-half one"><img src="./visual.webp" alt="The founder-approved Juss Protect Me gold portrait and illustrated product features" loading="eager" /></div>
+        <div class="mobile-content"><p class="eyebrow">Juss Protect Me · Model One</p><h1 id="one-heading">Real Protection for Real People</h1><p>For your devices, your identity, and everyday peace of mind. Designed to put people first.</p><div class="buttons"><a class="button" href="#early-access">Explore Early Access →</a><a class="button ghost" href="https://protect.jussco.company">Model One site</a></div>
+          <div class="feature-list"><div class="feature"><strong>Device Safety</strong><span>Safer everyday technology</span></div><div class="feature"><strong>Identity Protection</strong><span>Personal information first</span></div><div class="feature"><strong>Everyday Safety</strong><span>At home and on the go</span></div><div class="feature"><strong>Privacy First</strong><span>Your information, your choices</span></div></div>
+        </div>
+      </article>
+      <article class="mobile-panel two" aria-labelledby="two-heading">
+        <div class="image-half two"><img src="./visual.webp" alt="The founder-approved Juss Protect Me 2 violet portrait and illustrated product features" loading="lazy" /></div>
+        <div class="mobile-content"><p class="eyebrow">Juss Protect Me 2 · Model Two</p><h2 class="two-title" id="two-heading">AI Agent Security for What Comes Next</h2><p>Clearer boundaries, safer tools, and more understandable choices for AI-assisted work.</p><div class="buttons"><a class="button violet" href="#early-access">Explore Early Access →</a><a class="button ghost" href="https://protect2.jussco.company">Model Two site</a></div>
+          <div class="feature-list"><div class="feature"><strong>AI Agent Control</strong><span>Boundaries you define</span></div><div class="feature"><strong>Trusted Tools</strong><span>Purposeful permissions</span></div><div class="feature"><strong>Content Safety</strong><span>Designed for more trust</span></div><div class="feature"><strong>Action Insights</strong><span>Clearer understanding</span></div></div>
+        </div>
+      </article>
+    </div>
+    <section class="below" id="purpose"><h2>One Family. A Safer World.</h2><p>People first. Privacy focused. Purpose driven. Responsible AI. Protection that empowers.</p><div class="value-row"><span>People First</span>✧<span>Privacy Focused</span>✧<span>Responsible AI</span></div></section>
+    <section class="below" id="how-it-works"><h2>Protection that serves you.</h2><p>Model One focuses on people and everyday digital safety. Model Two focuses on more deliberate AI and software boundaries. Each product is being developed and evaluated separately.</p><div class="links"><a class="button" href="https://protect.jussco.company">Explore Model One</a><a class="button violet" href="https://protect2.jussco.company">Explore Model Two</a></div></section>
+    <section class="below" id="early-access"><h2>Get Early Access</h2><p>Our early-access experience is being prepared. Enrollment is not yet available through this page, and visiting this website does not activate device or AI-agent protection.</p><div class="links"><a class="button" href="https://protect.jussco.company">Model One: People &amp; Devices</a><a class="button violet" href="https://protect2.jussco.company">Model Two: AI &amp; Tools</a></div><p class="disclaimer">These are product previews, not a guarantee of active protection. We never claim you are enrolled unless a registration is actually confirmed.</p></section>
+    <footer class="below" id="support"><h2>JUSS &amp; CO.</h2><p>Real people. Real intelligence. A safer tomorrow.</p><p class="disclaimer">© Juss &amp; Co. · Protection That Empowers</p></footer>
   </main>
-  <footer><div class="wrap">© Juss &amp; Co. · Protect Me 2 · Software and infrastructure defense</div></footer>
 </body>
 </html>
