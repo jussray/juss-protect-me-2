@@ -18,6 +18,7 @@ test('mobile front door preserves both real people and AI safety journeys', asyn
   await expect(page.locator('.mobile-view')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Real Protection for Real People' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'AI Agent Security for What Comes Next' })).toBeVisible();
+  await page.locator('.image-half.two img').scrollIntoViewIfNeeded();
   await expect(page.locator('.image-half.two img')).toHaveJSProperty('naturalWidth', 1536);
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
   expect(overflow).toBe(false);
