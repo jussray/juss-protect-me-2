@@ -1,25 +1,29 @@
 import { test, expect } from '@playwright/test';
 
-test('Model Two public front door displays approved Juss & Co. artwork with honest early access', async ({ page }) => {
+test('Model Two is its own violet site, with only AI protection benefits', async ({ page }) => {
   await page.goto('/');
-  await expect(page).toHaveTitle('Juss & Co. | Protection That Empowers');
-  const art = page.locator('img.approved-art');
-  await expect(art).toBeVisible();
-  await expect(art).toHaveJSProperty('naturalWidth', 1536);
-  await page.getByRole('link', { name: 'Explore Model Two Early Access' }).click();
+  await expect(page).toHaveTitle('Juss Protect Me 2 | Juss & Co.');
+  await expect(page.getByRole('heading', { name: /AI Agent Security.*for What Comes Next/ })).toBeVisible();
+  await expect(page.locator('.feature-card')).toHaveCount(4);
+  await expect(page.getByRole('heading', { name: 'AI Agent Control' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Trusted Tools' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Content Safety' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Action Insights' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Real Protection for Real People/ })).toHaveCount(0);
+  await expect(page.locator('svg.portrait-picture')).toBeVisible();
+  await expect(page.locator('svg.feature-picture')).toHaveCount(4);
+  await page.getByRole('link', { name: /Explore Early Access/ }).click();
   await expect(page).toHaveURL(/#early-access$/);
-  await expect(page.getByRole('heading', { name: 'Get Early Access' })).toBeVisible();
-  await expect(page.getByText(/Enrollment is not yet available/)).toBeVisible();
+  await expect(page.getByText(/Enrollment is not open on this page/)).toBeVisible();
 });
 
-test('mobile front door preserves both real people and AI safety journeys', async ({ page }) => {
+test('Model Two mobile layout has no Model One design or horizontal overflow', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
-  await expect(page.locator('.mobile-view')).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Real Protection for Real People' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'AI Agent Security for What Comes Next' })).toBeVisible();
-  await page.locator('.image-half.two img').scrollIntoViewIfNeeded();
-  await expect(page.locator('.image-half.two img')).toHaveJSProperty('naturalWidth', 1536);
+  await expect(page.locator('.hero-portrait')).toBeVisible();
+  await expect(page.getByRole('heading', { name: /AI Agent Security.*for What Comes Next/ })).toBeVisible();
+  await expect(page.locator('.feature-card')).toHaveCount(4);
+  await expect(page.getByRole('heading', { name: 'Device Safety' })).toHaveCount(0);
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
   expect(overflow).toBe(false);
 });
