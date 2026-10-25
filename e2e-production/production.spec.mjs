@@ -1,12 +1,26 @@
 import { test, expect } from '@playwright/test';
 
-test('Model Two public front door is usable and not a claim of external protection', async ({ page }) => {
+test('Model Two public front door displays approved Juss & Co. artwork with honest early access', async ({ page }) => {
   await page.goto('/');
-  await expect(page).toHaveTitle('Juss Protect Me 2 | Guard the systems');
-  await expect(page.getByRole('heading', { name: /Guard the systems/ })).toBeVisible();
-  await page.getByRole('link', { name: "See what's inside" }).click();
-  await expect(page.getByRole('heading', { name: 'Three coordinated systems' })).toBeVisible();
-  await expect(page.getByText(/does not automatically secure other websites/)).toBeVisible();
+  await expect(page).toHaveTitle('Juss & Co. | Protection That Empowers');
+  const art = page.locator('img.approved-art');
+  await expect(art).toBeVisible();
+  await expect(art).toHaveJSProperty('naturalWidth', 1536);
+  await page.getByRole('link', { name: 'Explore Model Two Early Access' }).click();
+  await expect(page).toHaveURL(/#early-access$/);
+  await expect(page.getByRole('heading', { name: 'Get Early Access' })).toBeVisible();
+  await expect(page.getByText(/Enrollment is not yet available/)).toBeVisible();
+});
+
+test('mobile front door preserves both real people and AI safety journeys', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+  await expect(page.locator('.mobile-view')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Real Protection for Real People' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'AI Agent Security for What Comes Next' })).toBeVisible();
+  await expect(page.locator('.image-half.two img')).toHaveJSProperty('naturalWidth', 1536);
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+  expect(overflow).toBe(false);
 });
 
 test('production Shield reports only its own deployment scope', async ({ request }) => {
