@@ -1,10 +1,26 @@
 import { createShield } from './shield/shield.mjs';
+import { createFounderRoom } from './platform/founder-room.mjs';
+import { createPayments } from './platform/payments.mjs';
+import { createGateway } from './platform/gateway.mjs';
+import { createStore, statsFromStore } from './platform/store.mjs';
 
 // The public route reports this Worker's deployment only. It does not
 // claim to protect external repositories, devices, or unrelated apps.
 const app = {
   async fetch(request, env) {
     const { pathname } = new URL(request.url);
+    // Product platform (founder room, checkout, gateway) — routes are
+    // served by this Worker; anything unconfigured answers honestly.
+    const store = createStore(env);
+    if (pathname === '/founder' || pathname.startsWith('/founder/') || pathname === '/api/founder/state') {
+      return createFounderRoom({ statsProvider: () => statsFromStore(store) }).fetch(request, env);
+    }
+    if (pathname === '/buy' || pathname === '/webhooks/stripe' || pathname === '/checkout' || pathname.startsWith('/checkout/') || pathname === '/account' || pathname === '/account/rotate') {
+      return createPayments({ store }).fetch(request, env);
+    }
+    if (pathname === '/gateway/check' || pathname === '/account/actions') {
+      return createGateway({ store }).fetch(request, env);
+    }
     if (request.method === 'GET' && pathname === '/api/status') {
       return Response.json({
         service: 'juss-protect-me-2',
@@ -23,7 +39,7 @@ const app = {
 
 const shield = createShield(app, {
   service: 'juss-protect-me-2',
-  rateLimit: { paths: ['/api', '/api/*'], retryAfterSeconds: 60 },
+  rateLimit: { paths: ['/api', '/api/*', '/founder/login', '/gateway/check'], retryAfterSeconds: 60 },
 });
 
 // Keep response hardening outside Shield so decoys, limiter failures,
@@ -45,6 +61,9 @@ export default {
       headers.set(key, value);
     }
     const path = new URL(request.url).pathname;
+    if (path === '/founder' || path.startsWith('/founder/') || path === '/checkout' || path.startsWith('/checkout/') || path === '/buy' || path === '/account' || path === '/account/rotate') {
+      headers.set('Content-Security-Policy', "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; font-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; upgrade-insecure-requests");
+    }
     if (path === '/api' || path.startsWith('/api/')) {
       headers.set('Cache-Control', 'no-store');
     }
