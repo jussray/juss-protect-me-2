@@ -4,6 +4,8 @@ const port = Number(process.env.PROTECT_PROD_TEST_PORT || 8800);
 
 export default defineConfig({
   testDir: 'e2e-production',
+  // Node contract tests run in npm test; Playwright owns the browser specs.
+  testMatch: '**/*.spec.mjs',
   workers: 1,
   reporter: [['line'], ['html', { open: 'never', outputFolder: 'playwright-production-report' }]],
   use: {
