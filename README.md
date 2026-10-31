@@ -1,5 +1,10 @@
 # Protect Me
 
+Authority-window validation rejects intent and grant timestamps that are later
+than the current server time. Issuance is inclusive; grant expiry is exclusive.
+This kernel contract does not establish deployed protection or grant authority
+to external text naming modes or skills.
+
 **Keep AI agents, merges, and attackers inside the lines you set.**
 
 Protect Me is a three-part kit for founders and small teams who run several repos and let AI agents (Claude, ChatGPT, Codex, Copilot) write code in them:
@@ -180,3 +185,4 @@ Buy / contact: [CONTACT EMAIL OR CHECKOUT LINK]
 ---
 
 License: commercial. See [LICENSE](LICENSE). © [YEAR] [SELLER LEGAL NAME].
+
