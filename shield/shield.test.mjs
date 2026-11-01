@@ -140,6 +140,60 @@ test('a limiter that throws or answers nonsense fails closed with 503', async ()
   }
 });
 
+test('event-driven hook stays dormant until an observed attempt and forwards only redacted evidence', async () => {
+  const received = [];
+  const tasks = [];
+  const ctx = { waitUntil: (promise) => tasks.push(promise) };
+  const shield = createShield(upstream, { telemetry: false, onSecurityAttempt: (evidence) => received.push(evidence) });
+  const env = { SHIELD_SECRET: 'test-only-evidence-key' };
+
+  assert.equal((await shield.fetch(req('/'), env, ctx)).status, 200);
+
+  const verified = req('/', { headers: { 'user-agent': 'Googlebot/2.1' } });
+  Object.defineProperty(verified, 'cf', { value: { botManagement: { verifiedBot: true } } });
+  assert.equal((await shield.fetch(verified, env, ctx)).status, 200);
+
+  const probe = req('/.env?session=secret', {
+    headers: { 'user-agent': 'curl sensitive-agent', 'cf-connecting-ip': '203.0.113.16' },
+  });
+  assert.equal((await shield.fetch(probe, env, ctx)).status, 404);
+  await Promise.all(tasks);
+  assert.equal(received.length, 1);
+  assert.equal(received[0].event.verdict, 'PROBE');
+  assert.equal(received[0].event.pathname, '[redacted]');
+  assert.equal(received[0].event.identity.userAgent, null);
+  assert.equal(received[0].transportAuthority.canAuthorize, false);
+  assert.equal(received[0].receiptKind, 'hmac-sha256');
+  assert.equal(await verifyReceipt(received[0], env.SHIELD_SECRET), true);
+  assert.equal(JSON.stringify(received[0]).includes('203.0.113.16'), false);
+  assert.equal(JSON.stringify(received[0]).includes('sensitive-agent'), false);
+});
+
+test('unresponsive attempt receiver cannot stall probe or ordinary upstream serving without waitUntil', async () => {
+  const neverSettles = () => new Promise(() => {});
+  const shield = createShield(upstream, { telemetry: false, onSecurityAttempt: neverSettles });
+  const started = Date.now();
+  const probe = await shield.fetch(req('/.env'), {}, {});
+  assert.equal(probe.status, 404);
+  assert.ok(Date.now() - started < 1500, 'probe response must remain bounded');
+
+  const startedAutomation = Date.now();
+  const response = await shield.fetch(req('/', { headers: { 'user-agent': 'curl/8' } }), {}, {});
+  assert.equal(response.status, 200);
+  assert.ok(Date.now() - startedAutomation < 1500, 'upstream response must remain bounded');
+});
+
+test('event-driven callback remains optional and is validated before serving traffic', async () => {
+  assert.throws(() => createShield(upstream, { onSecurityAttempt: 'enabled' }), /onSecurityAttempt/);
+  const received = [];
+  const shield = createShield(upstream, { telemetry: false, onSecurityAttempt: (e) => received.push(e) });
+  assert.equal((await shield.fetch(req('/'), {}, {})).status, 200);
+  assert.equal(received.length, 0);
+  assert.equal((await shield.fetch(req('/', { headers: { 'user-agent': 'sqlmap' } }), {}, {})).status, 200);
+  assert.equal(received.length, 1);
+  assert.equal(received[0].transportAuthority.level, 'evidence_only');
+});
+
 test('malformed config is rejected at startup, not on every request', () => {
   assert.throws(() => createShield(upstream, { rateLimit: { paths: '/api/*' } }), /rateLimit.paths/);
   assert.throws(() => createShield(upstream, { probePaths: ['admin'] }), /probePaths/);

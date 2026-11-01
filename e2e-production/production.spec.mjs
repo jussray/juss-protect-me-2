@@ -12,9 +12,11 @@ test('Model Two is its own violet site, with only AI protection benefits', async
   await expect(page.getByRole('heading', { name: /Real Protection for Real People/ })).toHaveCount(0);
   await expect(page.locator('svg.portrait-picture')).toBeVisible();
   await expect(page.locator('svg.feature-picture')).toHaveCount(4);
-  await page.getByRole('link', { name: /Explore Early Access/ }).click();
-  await expect(page).toHaveURL(/#early-access$/);
-  await expect(page.getByText(/Enrollment is not open on this page/)).toBeVisible();
+  // The current public CTA goes to the site's checkout entry point, not a page anchor.
+  await expect(page.locator('#early-access')).toBeVisible();
+  await page.getByRole('link', { name: /Join Early Access/ }).click();
+  await expect(page).toHaveURL(/\/checkout$/);
+  await expect(page.getByRole('heading', { name: 'Enrollment opens at launch' })).toBeVisible();
 });
 
 test('Model Two mobile layout has no Model One design or horizontal overflow', async ({ page }) => {
