@@ -161,7 +161,7 @@ test('dedicated Juss Protect Me 2 guide has clear navigation, SEO facts and resp
     await expect(page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('link', { name: 'How It Works' })).toHaveAttribute('href', '/how-it-works.html');
     await expect(page.locator('#how-it-works')).toHaveCount(0);
     await page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('link', { name: 'How It Works' }).click();
-    await expect(page).toHaveURL(/\\/how-it-works\\.html$/);
+    await expect(page).toHaveURL((url) => url.pathname === '/how-it-works.html');
     await expect(page.getByRole('heading', { level: 1, name: 'How Juss Protect Me 2 Works' })).toBeVisible();
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://protect2.jussco.company/how-it-works.html');
     await expect(page.locator('meta[name="description"]')).toHaveAttribute('content', /checkup|agent security|AI agent|permissions|cybersecurity/i);
