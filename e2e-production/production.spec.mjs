@@ -86,3 +86,23 @@ test('security researchers have an independent reporting entrypoint', async ({ r
   expect(body).toContain('Contact: mailto:security@jussco.company');
   expect(body).toContain('Canonical: https://protect2.jussco.company/.well-known/security.txt');
 });
+
+test('Model Two About explains real scope and exposes search metadata on mobile', async ({ page }) => {
+  for (const width of [320, 390, 1280]) {
+    await page.setViewportSize({ width, height: 800 });
+    const response = await page.goto('/about.html');
+    expect(response?.status()).toBe(200);
+    await expect(page).toHaveTitle('About Juss Protect Me 2 | AI Agent Security | Juss & Co.');
+    await expect(page.getByRole('heading', { level: 1, name: /About Juss Protect Me 2: AI agent security/ })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Who is Model Two for?' })).toBeVisible();
+    await expect(page.getByText(/visiting this website alone does not activate protection/i)).toBeVisible();
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://protect2.jussco.company/about.html');
+    await expect(page.locator('meta[name="description"]')).toHaveAttribute('content', /AI-agent security project/);
+    const data = JSON.parse(await page.locator('script[type="application/ld+json"]').textContent());
+    expect(data['@graph'].find((entry) => entry['@type'] === 'AboutPage')?.mainEntity?.['@id']).toBe('https://protect2.jussco.company/#product');
+    await expect(page.getByRole('link', { name: /Juss Protect Me \(Model One\)/ })).toHaveAttribute('href', 'https://protect.jussco.company/about.html');
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
+    expect(overflow).toBe(false);
+    await page.screenshot({ path: `test-results/model-two-about-${width}.png` });
+  }
+});
