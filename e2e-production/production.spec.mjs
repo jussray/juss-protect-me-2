@@ -114,7 +114,7 @@ test('Model Two product catalog is independent and does not promise external pro
     await page.setViewportSize({ width, height: 820 });
     await page.goto('/');
     await page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('link', { name: 'Products' }).click();
-    await expect(page).toHaveURL(/\/products\.html$/);
+    await expect(page).toHaveURL((url) => url.pathname === '/products');
     await expect(page.locator('.cards .card')).toHaveCount(4);
     for (const title of ['Agent Permissions', 'Website & API Shield', 'Safe Code Releases', 'Evidence & Recovery']) {
       await expect(page.getByRole('heading', { name: title })).toBeVisible();
@@ -142,7 +142,7 @@ test('all four Model Two cards open distinct, honest product details on mobile a
       const link = page.getByRole('link', { name: `Explore ${label} protection details` });
       await expect(link).toHaveAttribute('href', `/products.html#${slug}`);
       await link.click();
-      await expect(page).toHaveURL(new RegExp(`/products\\.html#${slug}$`));
+      await expect(page).toHaveURL((url) => url.pathname === '/products' && url.hash === `#${slug}`);
       const section = page.locator(`#${slug}`);
       await expect(section).toBeVisible();
       await expect(section.getByRole('heading', { name: label })).toBeVisible();
@@ -159,12 +159,12 @@ test('dedicated Juss Protect Me 2 guide has clear navigation, SEO facts and resp
   for (const [width, height] of [[320, 740], [390, 844], [1280, 800]]) {
     await page.setViewportSize({ width, height });
     await page.goto('/');
-    await expect(page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('link', { name: 'How It Works' })).toHaveAttribute('href', '/how-it-works.html');
+    await expect(page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('link', { name: 'How It Works' })).toHaveAttribute('href', '/how-it-works');
     await expect(page.locator('#how-it-works')).toHaveCount(0);
     await page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('link', { name: 'How It Works' }).click();
-    await expect(page).toHaveURL((url) => url.pathname === '/how-it-works.html');
+    await expect(page).toHaveURL((url) => url.pathname === '/how-it-works');
     await expect(page.getByRole('heading', { level: 1, name: 'How Juss Protect Me 2 Works' })).toBeVisible();
-    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://protect2.jussco.company/how-it-works.html');
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://protect2.jussco.company/how-it-works');
     await expect(page.locator('meta[name="description"]')).toHaveAttribute('content', /checkup|agent security|AI agent|permissions|cybersecurity/i);
     await expect(page.locator('.step')).toHaveCount(3);
     await expect(page.locator('[itemtype="https://schema.org/Question"]')).toHaveCount(4);
@@ -178,7 +178,7 @@ test('dedicated Juss Protect Me 2 guide has clear navigation, SEO facts and resp
   }
   const sitemap = await request.get('/sitemap.xml');
   expect(sitemap.status()).toBe(200);
-  expect(await sitemap.text()).toContain('https://protect2.jussco.company/how-it-works.html');
+  expect(await sitemap.text()).toContain('https://protect2.jussco.company/how-it-works');
   const robots = await request.get('/robots.txt');
   expect(robots.status()).toBe(200);
   expect(await robots.text()).toContain('Sitemap: https://protect2.jussco.company/sitemap.xml');
