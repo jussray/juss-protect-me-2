@@ -126,3 +126,30 @@ test('Model Two product catalog is independent and does not promise external pro
     await page.screenshot({ path: `test-results/model-two-products-${width}.png` });
   }
 });
+
+test('all four Model Two cards open distinct, honest product details on mobile and desktop', async ({ page }) => {
+  const cards = [
+    ['AI Agent Control', 'agent-control'],
+    ['Trusted Tools', 'trusted-tools'],
+    ['Content Safety', 'content-safety'],
+    ['Action Insights', 'action-insights'],
+  ];
+  for (const width of [320, 390, 1280]) {
+    await page.setViewportSize({ width, height: 820 });
+    for (const [label, slug] of cards) {
+      await page.goto('/');
+      const link = page.getByRole('link', { name: `Explore ${label} protection details` });
+      await expect(link).toHaveAttribute('href', `/products.html#${slug}`);
+      await link.click();
+      await expect(page).toHaveURL(new RegExp(`/products\\.html#${slug}$`));
+      const section = page.locator(`#${slug}`);
+      await expect(section).toBeVisible();
+      await expect(section.getByRole('heading', { name: label })).toBeVisible();
+      const onscreen = await section.evaluate(el => {
+        const bounds = el.getBoundingClientRect();
+        return bounds.top < window.innerHeight && bounds.bottom > 0;
+      });
+      expect(onscreen).toBe(true);
+    }
+  }
+});
