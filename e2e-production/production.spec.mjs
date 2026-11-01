@@ -106,3 +106,23 @@ test('Model Two About explains real scope and exposes search metadata on mobile'
     await page.screenshot({ path: `test-results/model-two-about-${width}.png` });
   }
 });
+
+
+test('Model Two product catalog is independent and does not promise external protection', async ({ page }) => {
+  for (const width of [320, 390, 1280]) {
+    await page.setViewportSize({ width, height: 820 });
+    await page.goto('/');
+    await page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('link', { name: 'Products' }).click();
+    await expect(page).toHaveURL(/\/products\.html$/);
+    await expect(page.locator('.cards .card')).toHaveCount(4);
+    for (const title of ['Agent Permissions', 'Website & API Shield', 'Safe Code Releases', 'Evidence & Recovery']) {
+      await expect(page.getByRole('heading', { name: title })).toBeVisible();
+    }
+    await expect(page.getByText('Protecting this site only')).toBeVisible();
+    await expect(page.getByText(/Other websites are not automatically covered/)).toBeVisible();
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://protect2.jussco.company/products.html');
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
+    await page.screenshot({ path: `test-results/model-two-products-${width}.png` });
+  }
+});
