@@ -169,6 +169,20 @@ test('event-driven hook stays dormant until an observed attempt and forwards onl
   assert.equal(JSON.stringify(received[0]).includes('sensitive-agent'), false);
 });
 
+test('unresponsive attempt receiver cannot stall probe or ordinary upstream serving without waitUntil', async () => {
+  const neverSettles = () => new Promise(() => {});
+  const shield = createShield(upstream, { telemetry: false, onSecurityAttempt: neverSettles });
+  const started = Date.now();
+  const probe = await shield.fetch(req('/.env'), {}, {});
+  assert.equal(probe.status, 404);
+  assert.ok(Date.now() - started < 1500, 'probe response must remain bounded');
+
+  const startedAutomation = Date.now();
+  const response = await shield.fetch(req('/', { headers: { 'user-agent': 'curl/8' } }), {}, {});
+  assert.equal(response.status, 200);
+  assert.ok(Date.now() - startedAutomation < 1500, 'upstream response must remain bounded');
+});
+
 test('event-driven callback remains optional and is validated before serving traffic', async () => {
   assert.throws(() => createShield(upstream, { onSecurityAttempt: 'enabled' }), /onSecurityAttempt/);
   const received = [];
