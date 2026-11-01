@@ -54,6 +54,10 @@ export function resolveConfig(config = {}) {
     throw new TypeError('shield config: rateLimit.retryAfterSeconds must be a positive integer');
   }
   if (typeof cfg.rateLimit.binding !== 'string' || !cfg.rateLimit.binding) throw new TypeError('shield config: rateLimit.binding must be a name');
+  // The hook transports evidence only; it never grants authorization.
+  if (cfg.onSecurityAttempt != null && typeof cfg.onSecurityAttempt !== 'function') {
+    throw new TypeError('shield config: onSecurityAttempt must be a function');
+  }
   return cfg;
 }
 
@@ -295,11 +299,23 @@ export function createShield(upstream, config = {}) {
         sourceIp: request.headers.get('cf-connecting-ip'),
         cf: request.cf,
       }, cfg, secret);
-      if (cfg.telemetry && observation.notable) {
+      // Dormant for normal traffic and verified bots. An attempted probe or
+      // unverified automation may wake the evidence-only hook.
+      const attempted = ['PROBE', 'AUTOMATION', 'CLAIMED_CRAWLER'].includes(observation.event.verdict)
+        && observation.event.identity?.verifiedBot !== true;
+      const notify = attempted && typeof cfg.onSecurityAttempt === 'function';
+      if ((cfg.telemetry && observation.notable) || notify) {
         const line = observationForTelemetry(observation, secret)
-          .then((safe) => console.log('[protect-me-shield]', JSON.stringify(safe)))
+          .then(async (safe) => {
+            if (cfg.telemetry && observation.notable) console.log('[protect-me-shield]', JSON.stringify(safe));
+            if (notify) await cfg.onSecurityAttempt(Object.freeze({
+              ...safe,
+              transportAuthority: Object.freeze({ level: 'evidence_only', canAuthorize: false }),
+            }));
+          })
           .catch(() => console.log('[protect-me-shield]', '{"event":{"verdict":"TELEMETRY_ERROR"}}'));
         if (ctx?.waitUntil) ctx.waitUntil(line);
+        else if (notify) await line;
       }
       if (observation.event.verdict === 'PROBE') return decoyResponse();
       return upstream.fetch.call(upstream, request, env, ctx);
