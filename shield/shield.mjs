@@ -314,8 +314,22 @@ export function createShield(upstream, config = {}) {
             }));
           })
           .catch(() => console.log('[protect-me-shield]', '{"event":{"verdict":"TELEMETRY_ERROR"}}'));
-        if (ctx?.waitUntil) ctx.waitUntil(line);
-        else if (notify) await line;
+        if (ctx?.waitUntil) {
+          ctx.waitUntil(line);
+        } else if (notify) {
+          // A stalled optional receiver must never hold the HTTP response open.
+          // Outside a Worker execution context, wait briefly for a settled
+          // callback so direct fetch() consumers still receive evidence.
+          let timeout;
+          try {
+            await Promise.race([
+              line,
+              new Promise((resolve) => { timeout = setTimeout(resolve, 100); }),
+            ]);
+          } finally {
+            clearTimeout(timeout);
+          }
+        }
       }
       if (observation.event.verdict === 'PROBE') return decoyResponse();
       return upstream.fetch.call(upstream, request, env, ctx);
