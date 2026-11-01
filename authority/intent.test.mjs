@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFile } from 'node:fs/promises';
 
 import { authorizeIntentAction } from './intent.mjs';
 
@@ -160,3 +161,19 @@ test('expired or revoked authority fails closed', async () => {
   assert.equal(revoked.reasons.includes('grant_revoked'), true);
 });
 
+
+// Previews must never share the production KV or rate-limit bucket.
+test('Worker Preview must not bind production identity or rate limiter', async () => {
+  const config = JSON.parse(await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8'));
+  const kvId = (namespaces) => namespaces?.find((item) => item.binding === 'USERS_KV')?.id;
+  const rateId = (limits) => limits?.find((item) => item.name === 'SHIELD_RATE_LIMITER')?.namespace_id;
+  assert.ok(kvId(config.kv_namespaces), 'production KV is required');
+  assert.ok(kvId(config.previews?.kv_namespaces), 'isolated preview KV is required');
+  assert.notEqual(kvId(config.previews.kv_namespaces), kvId(config.kv_namespaces));
+  assert.ok(rateId(config.previews?.ratelimits), 'preview rate limit is required');
+  assert.notEqual(rateId(config.previews.ratelimits), rateId(config.ratelimits));
+  assert.ok(config.previews?.vars?.FOUNDER_EMAIL, 'preview founder identity is required');
+  assert.notEqual(config.previews.vars.FOUNDER_EMAIL, config.vars.FOUNDER_EMAIL);
+  assert.ok(config.previews?.vars?.FOUNDER_SALT, 'preview founder salt is required');
+  assert.notEqual(config.previews.vars.FOUNDER_SALT, config.vars.FOUNDER_SALT);
+});
