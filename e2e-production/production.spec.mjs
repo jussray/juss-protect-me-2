@@ -140,17 +140,13 @@ test('all four Model Two cards open distinct, honest product details on mobile a
     for (const [label, slug] of cards) {
       await page.goto('/');
       const link = page.getByRole('link', { name: `Explore ${label} protection details` });
-      await expect(link).toHaveAttribute('href', `/products.html#${slug}`);
+      await expect(link).toHaveAttribute('href', `/products#${slug}`);
       await link.click();
       await expect(page).toHaveURL((url) => url.pathname === '/products' && url.hash === `#${slug}`);
       const section = page.locator(`#${slug}`);
       await expect(section).toBeVisible();
       await expect(section.getByRole('heading', { name: label })).toBeVisible();
-      const onscreen = await section.evaluate(el => {
-        const bounds = el.getBoundingClientRect();
-        return bounds.top < window.innerHeight && bounds.bottom > 0;
-      });
-      expect(onscreen).toBe(true);
+      await expect(section).toBeInViewport({ ratio: 0.01 });
     }
   }
 });
