@@ -1,12 +1,46 @@
 import { test, expect } from '@playwright/test';
 
-test('Model Two public front door is usable and not a claim of external protection', async ({ page }) => {
+test('Model Two is its own violet site, with only AI protection benefits', async ({ page }) => {
   await page.goto('/');
-  await expect(page).toHaveTitle('Juss Protect Me 2 | Guard the systems');
-  await expect(page.getByRole('heading', { name: /Guard the systems/ })).toBeVisible();
-  await page.getByRole('link', { name: "See what's inside" }).click();
-  await expect(page.getByRole('heading', { name: 'Three coordinated systems' })).toBeVisible();
-  await expect(page.getByText(/does not automatically secure other websites/)).toBeVisible();
+  await expect(page).toHaveTitle('Juss Protect Me 2 | Juss & Co.');
+  await expect(page.getByRole('heading', { name: /AI Agent Security.*for What Comes Next/ })).toBeVisible();
+  await expect(page.locator('.feature-card')).toHaveCount(4);
+  await expect(page.getByRole('heading', { name: 'AI Agent Control' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Trusted Tools' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Content Safety' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Action Insights' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Real Protection for Real People/ })).toHaveCount(0);
+  await expect(page.locator('svg.portrait-picture')).toBeVisible();
+  await expect(page.locator('svg.feature-picture')).toHaveCount(4);
+  // The current public CTA goes to the site's checkout entry point, not a page anchor.
+  await expect(page.locator('#early-access')).toBeVisible();
+  await page.getByRole('link', { name: /Join Early Access/ }).click();
+  await expect(page).toHaveURL(/\/checkout$/);
+  await expect(page.getByRole('heading', { name: 'Enrollment opens at launch' })).toBeVisible();
+});
+
+test('Model Two narrow and standard phones preserve identity and a gated checkout', async ({ page }) => {
+  for (const [width, height] of [[320, 740], [390, 844]]) {
+    await page.setViewportSize({ width, height });
+    const home = await page.goto('/');
+    expect(home?.status()).toBe(200);
+    await expect(page).toHaveTitle('Juss Protect Me 2 | Juss & Co.');
+    await expect(page.locator('.hero-portrait')).toBeVisible();
+    await expect(page.getByRole('heading', { name: /AI Agent Security.*for What Comes Next/ })).toBeVisible();
+    await expect(page.locator('.feature-card')).toHaveCount(4);
+    await expect(page.getByRole('heading', { name: 'Device Safety' })).toHaveCount(0);
+    const sizes = await page.evaluate(() => ({
+      documentWidth: document.documentElement.scrollWidth,
+      viewportWidth: document.documentElement.clientWidth,
+    }));
+    expect(sizes.documentWidth).toBeLessThanOrEqual(sizes.viewportWidth + 1);
+    const join = page.getByRole('link', { name: /Join Early Access/ });
+    await expect(join).toHaveAttribute('href', '/checkout');
+    await page.screenshot({ path: `test-results/model-two-mobile-${width}.png` });
+    await join.click();
+    await expect(page).toHaveURL(/\\/checkout\\/?$/);
+    await expect(page.getByRole('heading', { name: 'Enrollment opens at launch' })).toBeVisible();
+  }
 });
 
 test('production Shield reports only its own deployment scope', async ({ request }) => {
