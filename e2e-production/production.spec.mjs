@@ -36,6 +36,18 @@ test('Model Two narrow and standard phones preserve identity and a gated checkou
     expect(sizes.documentWidth).toBeLessThanOrEqual(sizes.viewportWidth + 1);
     const join = page.getByRole('link', { name: /Join Early Access/ });
     await expect(join).toHaveAttribute('href', '/checkout');
+    const socialLinks = [
+      ['Juss & Co. on Instagram', 'https://www.instagram.com/jussnco/'],
+      ['Juss Ray on YouTube', 'https://www.youtube.com/channel/UCpEsqUi3uDpiNonJuu1hOKQ'],
+      ['Juss Rayy on LinkedIn', 'https://www.linkedin.com/in/juss-rayy-13ba691a1'],
+    ];
+    await expect(page.locator('.socials a')).toHaveCount(socialLinks.length);
+    for (const [name, href] of socialLinks) {
+      const link = page.getByRole('link', { name, exact: true });
+      await expect(link).toHaveAttribute('href', href);
+      await expect(link).toHaveAttribute('target', '_blank');
+      await expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    }
     await page.screenshot({ path: `test-results/model-two-mobile-${width}.png` });
     await join.click();
     await expect(page).toHaveURL((url) => url.pathname === '/checkout');
