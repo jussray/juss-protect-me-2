@@ -39,3 +39,29 @@ test('Model Two gateway blocks unknown claims and omitted tool audience on outbo
   });
   assert.ok(undeclared.reasons.includes('founder_publication_route_required'));
 });
+
+test('Model Two gateway fails closed on missing or blank tool names', async () => {
+  for (const payload of [
+    {},
+    { tool: '', content: 'Synthetic nonsecret report' },
+    { tool: '   ', content: 'Synthetic nonsecret report' },
+  ]) {
+    const checked = await evaluateCheck(null, user, payload);
+    assert.equal(checked.decision, 'block');
+    assert.ok(checked.reasons.includes('tool_required'));
+    assert.ok(checked.reasons.includes('tool_not_allowed'));
+  }
+});
+test('Model Two gateway does not allow an empty tool even if member policy lists it', async () => {
+  const member = { ...user, id: 'synthetic-empty-tool-member', policy: { tools: ['', 'inspect'] } };
+  const checked = await evaluateCheck(null, member, { tool: '', content: 'Synthetic nonsecret report' });
+  assert.equal(checked.decision, 'block');
+  assert.ok(checked.reasons.includes('tool_required'));
+});
+test('Model Two gateway rejects a non-allowlisted tool while preserving valid inspection', async () => {
+  const rejected = await evaluateCheck(null, user, { tool: 'unknown_tool', content: 'Synthetic nonsecret report' });
+  assert.equal(rejected.decision, 'block');
+  assert.ok(rejected.reasons.includes('tool_not_allowed'));
+  const allowed = await evaluateCheck(null, user, { tool: 'inspect', content: 'Synthetic nonsecret report' });
+  assert.equal(allowed.decision, 'allow');
+});

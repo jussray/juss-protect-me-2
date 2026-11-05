@@ -47,8 +47,9 @@ export async function evaluateCheck(store, user, body) {
   if (user.entitlement !== 'active') reasons.push(`membership_${user.entitlement}`);
   if (rateLimited(user.id)) reasons.push('rate_limit');
   const tool = typeof body?.tool === 'string' ? body.tool : '';
+  if (!tool.trim()) reasons.push('tool_required');
   const policy = user.policy || {};
-  if (Array.isArray(policy.tools) && tool && !policy.tools.includes(tool)) reasons.push('tool_not_allowed');
+  if (Array.isArray(policy.tools) && !policy.tools.includes(tool)) reasons.push('tool_not_allowed');
   if (tool && DEFAULT_DENIED_TOOLS.some((d) => tool === d || tool.startsWith('admin'))) reasons.push('tool_denied_by_default');
   if (Array.isArray(policy.deniedTools) && policy.deniedTools.includes(tool)) reasons.push('tool_denied_by_member');
   const content = typeof body?.content === 'string' ? body.content : '';
