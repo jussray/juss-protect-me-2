@@ -1,3 +1,4 @@
+import { assessSauceGuard } from '../security/sauce-guard.mjs';
 // Juss Protect Me Two — the gateway: the checkpoint a member's key plugs into.
 // Every agent action passes here BEFORE it runs:
 //   key valid? -> membership active? -> tool inside the member's boundaries?
@@ -53,6 +54,26 @@ export async function evaluateCheck(store, user, body) {
   const content = typeof body?.content === 'string' ? body.content : '';
   if (content.length > 65536) reasons.push('payload_too_large');
   if (CREDENTIAL_PATTERNS.some((re) => re.test(content))) reasons.push('credential_content_blocked');
+  // The gateway is not a publication authority. External shares need the separately
+  // verified founder route even when screening detects no unsafe patterns.
+  const external = ['public', 'external'].includes(body?.audience);
+  const outboundTools = new Set(['publish', 'post_social', 'external_share', 'send_email', 'upload_public', 'webhook_send']);
+  if (content || external) {
+    const sauce = assessSauceGuard({
+      scope: 'infrastructure',
+      audience: external ? 'public' : 'internal',
+      content,
+      claims: Array.isArray(body?.claims) ? body.claims : [],
+      flags: {
+        privateImplementation: body?.privateImplementation === true,
+        privateMetrics: body?.privateMetrics === true,
+        customerData: body?.customerData === true,
+      },
+    });
+    if (sauce.disposition === 'BLOCK') reasons.push('sauce_guard_content_blocked');
+  }
+  if (external || outboundTools.has(tool)) reasons.push('founder_publication_route_required');
+
   return { decision: reasons.length ? 'block' : 'allow', reasons, tool };
 }
 
