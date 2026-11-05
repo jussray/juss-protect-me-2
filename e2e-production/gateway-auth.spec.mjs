@@ -77,7 +77,7 @@ test('Model Two real Worker gateway authenticates a synthetic member and enforce
 
   const invalidJson = await request.post(endpoint, {
     headers: { Authorization: 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
-    data: '{',
+    data: Buffer.from('{'),
   });
   expect(invalidJson.status()).toBe(400);
   expect((await invalidJson.json()).reasons).toContain('invalid_json');
