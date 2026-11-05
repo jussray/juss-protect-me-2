@@ -128,6 +128,18 @@ h1{font:clamp(38px,4.2vw,60px)/1.06 'PlayfairDisplay',Georgia,'Times New Roman',
   .feature-details p{font-size:12px}
   .mission h2{letter-spacing:.12em}
 }
+
+/* First-paint legibility and phone framing verified against Playwright screenshots. */
+.hero-copy > *, .hero-pill {animation:none!important}
+body.violet .hero{background:radial-gradient(ellipse at 88% 13%,rgba(116,40,194,.27),transparent 48%),linear-gradient(115deg,#07040c,#140920 65%,#070510)}
+body.violet .hero::before{opacity:.45}
+body.violet .hero-lead{color:#f2e9fa}
+@media(max-width:530px){
+ .hero-portrait{height:clamp(188px,54vw,300px)}
+ .product-mark{margin-bottom:18px}
+ .hero h1{margin-bottom:10px}
+ .hero-lead{margin-bottom:17px}
+}
 </style></head>
 <body class="violet">
 <header class="site-top" id="home"><div class="top-inner">
