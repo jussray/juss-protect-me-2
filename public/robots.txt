@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /founder
+Disallow: /account
+Disallow: /api/
+Disallow: /checkout
+Sitemap: https://protect2.jussco.company/sitemap.xml
