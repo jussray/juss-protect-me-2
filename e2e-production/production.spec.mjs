@@ -17,7 +17,9 @@ test('Model Two is its own violet site, with only AI protection benefits', async
   await expect(page.locator('svg.feature-picture')).toHaveCount(4);
   // The current public CTA goes to the site's checkout entry point, not a page anchor.
   await expect(page.locator('#early-access')).toBeVisible();
-  await page.getByRole('link', { name: /Join Early Access/ }).click();
+  await expect(page.getByRole('link', { name: /Explore Agent Controls/ })).toHaveAttribute('href', '/products#agent-control');
+  await expect(page.locator('.preview-step')).toHaveCount(3);
+  await page.getByRole('link', { name: /Enrollment Status/ }).first().click();
   await expect(page).toHaveURL(/\/checkout$/);
   await expect(page.getByRole('heading', { name: 'Enrollment opens at launch' })).toBeVisible();
 });
@@ -37,8 +39,12 @@ test('Model Two narrow and standard phones preserve identity and a gated checkou
       viewportWidth: document.documentElement.clientWidth,
     }));
     expect(sizes.documentWidth).toBeLessThanOrEqual(sizes.viewportWidth + 1);
-    const join = page.getByRole('link', { name: /Join Early Access/ });
-    await expect(join).toHaveAttribute('href', '/checkout');
+    const primary = page.getByRole('link', { name: /Explore Agent Controls/ });
+    await expect(primary).toHaveAttribute('href', '/products#agent-control');
+    await expect(page.locator('.preview-step')).toHaveCount(3);
+    await expect(page.locator('.hero-availability')).toContainText(/gateway preview/i);
+    const enrollment = page.getByRole('link', { name: /Enrollment Status/ }).first();
+    await expect(enrollment).toHaveAttribute('href', '/checkout');
     const socialLinks = [
       ['Juss & Co. on Instagram', 'https://www.instagram.com/jussnco/'],
       ['Juss Ray on YouTube', 'https://www.youtube.com/channel/UCpEsqUi3uDpiNonJuu1hOKQ'],
@@ -52,7 +58,7 @@ test('Model Two narrow and standard phones preserve identity and a gated checkou
       await expect(link).toHaveAttribute('rel', 'noopener noreferrer');
     }
     await page.screenshot({ path: `test-results/model-two-mobile-${width}.png` });
-    await join.click();
+    await enrollment.click();
     await expect(page).toHaveURL((url) => url.pathname === '/checkout');
     await expect(page.getByRole('heading', { name: 'Enrollment opens at launch' })).toBeVisible();
   }
