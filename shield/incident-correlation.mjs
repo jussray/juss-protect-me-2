@@ -128,7 +128,7 @@ export async function correlateSecurityEvents({
   }
   return Object.freeze({
     schema: CORRELATION_SCHEMA,
-    state: findings.length ? 'REVIEW' : 'CLEAR',
+    state: findings.length ? 'REVIEW' : events.length ? 'NO_CORRELATION' : 'UNKNOWN',
     inspected: events.length,
     ignoredStale,
     duplicates,

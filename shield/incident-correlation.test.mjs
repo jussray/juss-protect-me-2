@@ -48,7 +48,7 @@ test('does not correlate unrelated services, spaced events, or distinct network 
     [edge(0, 'EDGE001'), edge(1000, 'EDGE002', { actor: 'c'.repeat(64) }),
       edge(2000, 'EDGE003', { actor: 'd'.repeat(64) }), sensitive('privilege_change', 3000, 'IAM001')],
   ];
-  for (const input of cases) assert.equal((await run(input)).state, 'CLEAR');
+  for (const input of cases) assert.equal((await run(input)).state, 'NO_CORRELATION');
 });
 
 test('deduplicates identical replay and blocks conflicting evidence references', async () => {
@@ -77,7 +77,7 @@ test('requires opaque IDs, time proof, and strict schema; ignores old signed eve
     edge(0, 'EDGE001', { actorNamespace: 'principal' }),
   ]) await assert.rejects(correlateSecurityEvents({ observations: [await seal(invalid)], now: iso(60_000), signingSecret: secret }), /INCIDENT_UNTRUSTED_EVIDENCE/);
   const stale = await run([edge(-700_000, 'EDGE001'), sensitive('privilege_change', 3000, 'IAM001')]);
-  assert.equal(stale.state, 'CLEAR');
+  assert.equal(stale.state, 'NO_CORRELATION');
   assert.equal(stale.ignoredStale, 1);
   await assert.rejects(run([edge(70_000, 'EDGE001')]), /INCIDENT_FUTURE_EVIDENCE/);
 });
@@ -88,4 +88,11 @@ test('enforces bounded processing and deterministic order', async () => {
   await assert.rejects(run([], { burstThreshold: 1 }), /INCIDENT_INVALID_SETTINGS/);
   const values = [...burst, sensitive('privilege_change', 3000, 'IAM001')];
   assert.deepEqual(await run(values), await run([...values].reverse()));
+});
+
+test('empty verified-input set is UNKNOWN, never a clean bill of health', async () => {
+  const result = await run([]);
+  assert.equal(result.state, 'UNKNOWN');
+  assert.equal(result.inspected, 0);
+  assert.equal(result.canAuthorize, false);
 });
