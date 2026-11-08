@@ -13,10 +13,11 @@
     "./authority": "./authority/intent.mjs",
     "./counter-pressure": "./authority/counter-pressure.mjs",
     "./sauce-guard": "./security/sauce-guard.mjs",
-    "./incident-correlation": "./shield/incident-correlation.mjs"
+    "./incident-correlation": "./shield/incident-correlation.mjs",
+    "./incident-signal-bridge": "./shield/incident-signal-bridge.mjs"
   },
   "scripts": {
-    "test": "node --test shield/shield.test.mjs shield/incident-correlation.test.mjs security/sauce-guard.test.mjs platform/founder-room-sauce-guard.test.mjs platform/gateway-sauce-guard.test.mjs artifact/artifact-boundary.test.mjs evidence/evidence-ledger.test.mjs hallway/protocol.test.mjs authority/intent.test.mjs authority/counter-pressure.test.mjs muse-provider.test.mjs platform/jusspay-contract.test.mjs && python3 gate/test_worlds_gate.py && python3 contract/scripts/test_preflight.py",
+    "test": "node --test shield/shield.test.mjs shield/incident-correlation.test.mjs shield/incident-signal-bridge.test.mjs shield/worker-incident-signals.test.mjs security/sauce-guard.test.mjs platform/founder-room-sauce-guard.test.mjs platform/gateway-sauce-guard.test.mjs artifact/artifact-boundary.test.mjs evidence/evidence-ledger.test.mjs hallway/protocol.test.mjs authority/intent.test.mjs authority/counter-pressure.test.mjs muse-provider.test.mjs platform/jusspay-contract.test.mjs && python3 gate/test_worlds_gate.py && python3 contract/scripts/test_preflight.py",
     "test:artifact": "node --test artifact/artifact-boundary.test.mjs",
     "test:evidence": "node --test evidence/evidence-ledger.test.mjs",
     "test:hallway": "node --test hallway/protocol.test.mjs",
@@ -43,6 +44,9 @@
     "shield/shield.test.mjs",
     "shield/incident-correlation.mjs",
     "shield/incident-correlation.test.mjs",
+    "shield/incident-signal-bridge.mjs",
+    "shield/incident-signal-bridge.test.mjs",
+    "shield/worker-incident-signals.test.mjs",
     "artifact/artifact-boundary.mjs",
     "artifact/artifact-boundary.test.mjs",
     "evidence/ledger.mjs",

@@ -77,9 +77,20 @@ export function escapeHtml(value) {
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
-export function createPayments({ store, fetchImpl = fetch }) {
+export function createPayments({ store, fetchImpl = fetch, onSecurityChange = null }) {
+  if (onSecurityChange !== null && typeof onSecurityChange !== 'function') {
+    throw new TypeError('INCIDENT_INVALID_SERVER_CHANGE_HOOK');
+  }
+  // Reporting failure must not falsely turn a committed account change into an HTTP failure.
+  async function reportCommittedChange(event, ctx) {
+    if (!onSecurityChange) return;
+    const reporting = Promise.resolve().then(() => onSecurityChange(event))
+      .catch(() => console.error('INCIDENT_SIGNAL_DELIVERY_FAILED'));
+    if (ctx?.waitUntil) ctx.waitUntil(reporting);
+    else await reporting;
+  }
   return {
-    async fetch(request, env) {
+    async fetch(request, env, ctx) {
       const url = new URL(request.url);
       const { pathname } = url;
 
@@ -138,6 +149,7 @@ export function createPayments({ store, fetchImpl = fetch }) {
         user.policy = policy;
         user.updatedAt = Date.now();
         await saveUser(store, user);
+        await reportCommittedChange({ principalId: user.id, operation: 'policy_saved', committed: true }, ctx);
         return new Response(null, { status: 303, headers: { Location: `/account?token=${encodeURIComponent(token)}&saved=1` } });
       }
 
@@ -167,6 +179,7 @@ export function createPayments({ store, fetchImpl = fetch }) {
         user.updatedAt = Date.now();
         await saveUser(store, user);
         await store.put(`keyhash:${user.apiKeyHash}`, user.id);
+        await reportCommittedChange({ principalId: user.id, operation: 'key_rotated', committed: true }, ctx);
         return html(pageShell('New key', `<div class="card"><h1>Your new gateway key</h1><div class="warn">Save it now — shown once. Your previous key stops working immediately.</div><div class="key" style="margin-top:12px">${raw}</div><p style="margin-top:16px"><a href="/account?token=${encodeURIComponent(String(form.get('token')))}">Back to your account</a></p></div>`));
       }
 

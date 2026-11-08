@@ -1,4 +1,5 @@
 import { createShield } from './shield/shield.mjs';
+import { createIncidentSignalBridge } from './shield/incident-signal-bridge.mjs';
 import { createFounderRoom } from './platform/founder-room.mjs';
 import { createPayments } from './platform/payments.mjs';
 import { createGateway } from './platform/gateway.mjs';
@@ -6,7 +7,8 @@ import { createStore, listUsers, statsFromStore } from './platform/store.mjs';
 
 // The public route reports this Worker's deployment only. It does not
 // claim to protect external repositories, devices, or unrelated apps.
-const app = {
+function createApp(bridge) {
+  return {
   async fetch(request, env) {
     const { pathname } = new URL(request.url);
     // Product platform (founder room, checkout, gateway) — routes are
@@ -16,7 +18,7 @@ const app = {
       return createFounderRoom({ statsProvider: () => statsFromStore(store), membersProvider: () => listUsers(store) }).fetch(request, env);
     }
     if (pathname === '/buy' || pathname === '/webhooks/stripe' || pathname === '/checkout' || pathname.startsWith('/checkout/') || pathname === '/account' || pathname === '/account/rotate' || pathname === '/account/policy') {
-      return createPayments({ store }).fetch(request, env);
+      return createPayments({ store, onSecurityChange: bridge?.onPrivilegeChange }).fetch(request, env);
     }
     if (pathname === '/gateway/check' || pathname === '/account/actions') {
       return createGateway({ store }).fetch(request, env);
@@ -35,12 +37,31 @@ const app = {
     }
     return env.ASSETS.fetch(request);
   },
-};
+  };
+}
 
-const shield = createShield(app, {
-  service: 'juss-protect-me-2',
-  rateLimit: { paths: ['/api', '/api/*', '/founder/login', '/gateway/check'], retryAfterSeconds: 60 },
-});
+// Deliberately dormant until explicitly provisioned with a separate signer,
+// verified source identity and the Cloudflare Queue. No public ingestion route.
+function incidentBridgeFor(env) {
+  if (env?.INCIDENT_SIGNALS_ENABLED !== 'true') return null;
+  return createIncidentSignalBridge({
+    service: 'juss-protect-me-2',
+    identity: {
+      source: {
+        repository: 'jussray/juss-protect-me-2',
+        branch: env.INCIDENT_SOURCE_BRANCH,
+        commitSha: env.INCIDENT_SOURCE_SHA,
+      },
+      runtime: {
+        environment: env.INCIDENT_ENVIRONMENT,
+        buildId: env.INCIDENT_BUILD_ID,
+      },
+    },
+    shieldSecret: env.SHIELD_SECRET,
+    signingSecret: env.INCIDENT_SIGNING_SECRET,
+    sink: env.INCIDENT_EVIDENCE_QUEUE,
+  });
+}
 
 // Keep response hardening outside Shield so decoys, limiter failures,
 // API responses, and static assets receive the same security headers.
@@ -55,6 +76,12 @@ const RESPONSE_HEADERS = Object.freeze({
 
 export default {
   async fetch(request, env, ctx) {
+    const bridge = incidentBridgeFor(env);
+    const shield = createShield(createApp(bridge), {
+      service: 'juss-protect-me-2',
+      rateLimit: { paths: ['/api', '/api/*', '/founder/login', '/gateway/check'], retryAfterSeconds: 60 },
+      ...(bridge ? { onSecurityAttempt: bridge.onShieldAttempt } : {}),
+    });
     const result = await shield.fetch(request, env, ctx);
     const headers = new Headers(result.headers);
     for (const [key, value] of Object.entries(RESPONSE_HEADERS)) {
