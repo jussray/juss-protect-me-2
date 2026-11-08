@@ -1,3 +1,5 @@
+import { verifyReceipt } from '../shield/shield.mjs';
+
 const FULL_SHA = /^[0-9a-f]{40}$/i;
 const SHA256 = /^[0-9a-f]{64}$/i;
 const STABLE_ID = /^[A-Z][A-Z0-9_-]{2,127}$/;
@@ -175,12 +177,17 @@ export function isGovernedActionEligible({ receipts, requiredChecks, currentIden
   return true;
 }
 
-export function shieldObservationToReceipt(observation, identity, observedAt) {
+export async function shieldObservationToReceipt(observation, identity, observedAt, secret = null) {
   if (!observation?.receipt || !observation?.event) throw new Error('shield observation requires event and receipt');
   assertEvidenceIdentity(identity);
   assertIso(observedAt, 'observedAt');
-  const suffix = String(observation.receipt).slice(0, 16).toUpperCase();
   const authenticated = observation.receiptKind === 'hmac-sha256';
+  if (!['hmac-sha256', 'sha256-unauthenticated'].includes(observation.receiptKind)
+    || (authenticated && (typeof secret !== 'string' || !secret))
+    || !(await verifyReceipt(observation, authenticated ? secret : null))) {
+    throw new Error('SHIELD_OBSERVATION_SIGNATURE_UNVERIFIED');
+  }
+  const suffix = String(observation.receipt).slice(0, 16).toUpperCase();
   return createEvidenceReceipt({
     id: `SHIELD-${suffix}`,
     findingId: `SEC-${suffix}`,

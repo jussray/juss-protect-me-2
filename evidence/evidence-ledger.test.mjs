@@ -1,3 +1,4 @@
+import { classify, observationForTelemetry } from '../shield/shield.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -134,26 +135,25 @@ test('exact separate founder approval can authorize only after required proof is
   }), true);
 });
 
-test('authenticated Shield observation becomes verified evidence, not authority', () => {
-  const observation = {
-    event: { service: 'portfolio-api', verdict: 'PROBE' },
-    receipt: 'e'.repeat(64),
-    receiptKind: 'hmac-sha256',
-  };
-  const r = shieldObservationToReceipt(observation, identity, '2026-10-05T18:00:00.000Z');
+test('authenticated Shield observation becomes verified evidence only after signature verification', async () => {
+  const secret = 'test-only-server-signing-secret';
+  const classified = await classify({ method: 'GET', url: 'https://example.test/.env', userAgent: 'curl' }, { service: 'portfolio-api' }, secret);
+  const observation = await observationForTelemetry(classified, secret);
+  const r = await shieldObservationToReceipt(observation, identity, '2026-10-05T18:00:00.000Z', secret);
   assert.equal(r.state, 'verified');
   assert.equal(r.check, 'shield_event');
   assert.equal(r.authority.canAuthorize, false);
+  await assert.rejects(shieldObservationToReceipt(observation, identity, '2026-10-05T18:00:00.000Z'), /SIGNATURE_UNVERIFIED/);
+  await assert.rejects(shieldObservationToReceipt(observation, identity, '2026-10-05T18:00:00.000Z', 'wrong-secret'), /SIGNATURE_UNVERIFIED/);
+  await assert.rejects(shieldObservationToReceipt({ ...observation, event: { ...observation.event, verdict: 'NORMAL' } }, identity, '2026-10-05T18:00:00.000Z', secret), /SIGNATURE_UNVERIFIED/);
 });
 
-test('unauthenticated Shield digest remains inferred', () => {
-  const observation = {
-    event: { service: 'portfolio-api', verdict: 'AUTOMATION' },
-    receipt: 'f'.repeat(64),
-    receiptKind: 'sha256-unauthenticated',
-  };
-  const r = shieldObservationToReceipt(observation, identity, '2026-10-05T18:00:00.000Z');
+test('unauthenticated Shield digest remains inferred only when digest matches', async () => {
+  const classified = await classify({ method: 'GET', url: 'https://example.test/.env', userAgent: 'curl' }, { service: 'portfolio-api' });
+  const observation = await observationForTelemetry(classified);
+  const r = await shieldObservationToReceipt(observation, identity, '2026-10-05T18:00:00.000Z');
   assert.equal(r.state, 'inferred');
+  await assert.rejects(shieldObservationToReceipt({ ...observation, receipt: 'f'.repeat(64) }, identity, '2026-10-05T18:00:00.000Z'), /SIGNATURE_UNVERIFIED/);
 });
 
 const approval = () => ({
