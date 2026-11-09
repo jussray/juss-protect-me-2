@@ -45,7 +45,8 @@ export async function evaluateCheck(store, user, body) {
   const reasons = [];
   if (user.entitlement !== 'active') reasons.push(`membership_${user.entitlement}`);
   if (rateLimited(user.id)) reasons.push('rate_limit');
-  const tool = typeof body?.tool === 'string' ? body.tool : '';
+  const tool = typeof body?.tool === 'string' ? body.tool.trim() : '';
+  if (!tool) reasons.push('missing_tool');
   const policy = user.policy || {};
   if (Array.isArray(policy.tools) && tool && !policy.tools.includes(tool)) reasons.push('tool_not_allowed');
   if (tool && DEFAULT_DENIED_TOOLS.some((d) => tool === d || tool.startsWith('admin'))) reasons.push('tool_denied_by_default');
