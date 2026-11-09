@@ -1,0 +1,19 @@
+{
+  "schema_version": "1.1",
+  "target": {"name": "Example consequential decision", "version": "v1", "date": "2026-11-08"},
+  "decider": "Founder",
+  "stakes": "consequential",
+  "audience": ["Founder"],
+  "material": [],
+  "coverage": ["premise", "assumptions", "failure_modes", "misuse", "authority", "evidence", "reversibility", "lindy", "second_order", "cheaper_path"],
+  "adversaries": [
+    {"kind": "outsider", "who": "unknown", "why": "unknown", "reach": "unknown", "first_try": "unknown", "frame_check": "who defines this threat and who could be harmed?"},
+    {"kind": "insider", "who": "unknown", "why": "unknown", "reach": "unknown", "first_try": "unknown", "frame_check": "who defines this threat and who could be harmed?"},
+    {"kind": "untrusted_input", "who": "untrusted document/model", "why": "unknown", "reach": "unknown", "first_try": "unknown", "frame_check": "who defines this threat and who could be harmed?"}
+  ],
+  "stone": {"assumption": "State the breaking assumption", "verified": false, "reversal_evidence": "Name the independent evidence that would verify it"},
+  "findings": [
+    {"id": "M-1", "source": "pass1", "frame_check": "none", "severity": "High", "attack": "No supporting evidence yet", "scenario": "Decision would rely on missing proof", "consequence": "Consequence must be named", "evidence_tag": "UNVERIFIED", "source_of_knowledge": "AUTHORED", "likelihood": "medium", "likelihood_basis": "No data supplied", "check_needed": "Provide source quote and inspectable artifact", "rebuttal": {"outcome": "Stands", "defense": "none"}, "named_change": "Collect verified evidence before deciding"}
+  ],
+  "next_gate": "Founder reviews the missing evidence"
+}

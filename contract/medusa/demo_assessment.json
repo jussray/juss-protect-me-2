@@ -1,0 +1,86 @@
+{
+  "schema_version": "1.1",
+  "target": {
+    "name": "Demo assessment only",
+    "version": "v1.1",
+    "date": "2026-11-08"
+  },
+  "decider": "Founder",
+  "stakes": "consequential",
+  "audience": [
+    "Founder"
+  ],
+  "material": [
+    {
+      "path": "demo_source.txt",
+      "sha256": "3fefe411f1686df66c7a2ef5310fa0cec9d0061a713cbb433df6cf25d6f92876"
+    }
+  ],
+  "coverage": [
+    "premise",
+    "assumptions",
+    "failure_modes",
+    "misuse",
+    "authority",
+    "evidence",
+    "reversibility",
+    "lindy",
+    "second_order",
+    "cheaper_path"
+  ],
+  "adversaries": [
+    {
+      "kind": "outsider",
+      "who": "synthetic outsider actor",
+      "why": "may favor approval bypass",
+      "reach": "only mocked document fields",
+      "first_try": "submit an unsupported assertion",
+      "frame_check": "founder controls threat label and potentially affected parties bear risk"
+    },
+    {
+      "kind": "insider",
+      "who": "synthetic insider actor",
+      "why": "may favor approval bypass",
+      "reach": "only mocked document fields",
+      "first_try": "submit an unsupported assertion",
+      "frame_check": "founder controls threat label and potentially affected parties bear risk"
+    },
+    {
+      "kind": "untrusted_input",
+      "who": "synthetic untrusted_input actor",
+      "why": "may favor approval bypass",
+      "reach": "only mocked document fields",
+      "first_try": "submit an unsupported assertion",
+      "frame_check": "founder controls threat label and potentially affected parties bear risk"
+    }
+  ],
+  "stone": {
+    "assumption": "Published evidence can be checked",
+    "verified": true,
+    "reversal_evidence": "Name the independent evidence that would verify it",
+    "source_path": "demo_source.txt",
+    "quote": "independent evidence is required"
+  },
+  "findings": [
+    {
+      "id": "M-1",
+      "source": "pass1",
+      "frame_check": "none",
+      "severity": "High",
+      "attack": "No supporting evidence yet",
+      "scenario": "Decision would rely on missing proof",
+      "consequence": "Consequence must be named",
+      "evidence_tag": "UNVERIFIED",
+      "source_of_knowledge": "AUTHORED",
+      "likelihood": "medium",
+      "likelihood_basis": "No data supplied",
+      "check_needed": "Provide source quote and inspectable artifact",
+      "rebuttal": {
+        "outcome": "Stands",
+        "defense": "none"
+      },
+      "named_change": "Collect verified evidence before deciding"
+    }
+  ],
+  "next_gate": "Founder reviews the missing evidence"
+}
