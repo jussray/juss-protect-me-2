@@ -59,9 +59,11 @@ class AuthorityGrantTests(unittest.TestCase):
         return code, output.getvalue(), err.getvalue()
 
     def issue(self, who='alice', name='parent', extra=()):
+        # Delegated children cannot outlive the parent; leave an hour of margin.
+        duration = '23' if '--delegates-from' in extra and '--hours' not in extra else '24'
         return self.cli('issue', '--decider', who, '--key', self.keys[who], '--grant-id', name,
                         '--action-class', 'quarantine_file', '--target-scope', '/srv/apps/payments',
-                        '--hours', '24', *extra)
+                        '--hours', duration, *extra)
 
     def assert_blocked(self, result, text=None):
         self.assertEqual(result[0], 2, result)
