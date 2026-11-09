@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import authority_grant as GRANT
+import eventbus as BUS
 
 VERSION = "0.1.0-L4-PREFLIGHT"
 MAX_EVENT_BYTES = 32768
@@ -136,6 +137,61 @@ def review(grant_id, target, detection, *, clock=None):
         return outcome("BLOCKED", reason, grant_id=grant_id, target=target)
 
 
+
+def review_signed_bus(grant_id, target, detection_event_id, *, clock=None):
+    """Read-only inspection of real signed feedback and its original witnesses.
+
+    An authenticated local bus is NOT independent custody or permission to act.
+    Returns only BLOCKED or HOLD. Never moves, deletes or restores a file.
+    """
+    try:
+        require(isinstance(detection_event_id, str) and SHA256.fullmatch(detection_event_id),
+                'INVALID_SIGNED_DETECTION_ID')
+        root = BUS.busdir()
+        lock = root / '.lock'
+        require(root.is_dir() and not root.is_symlink() and
+                lock.is_file() and not lock.is_symlink(), 'SIGNED_BUS_NOT_INITIALIZED')
+        snap = BUS.verified_snapshot()
+        records = snap['records']
+        matches = [r for r in records if r['event']['event_id'] == detection_event_id]
+        require(len(matches) == 1, 'SIGNED_DETECTION_NOT_FOUND')
+        rec = matches[0]
+        require(rec['event']['event_type'] == 'detection_feedback', 'NOT_DETECTION_FEEDBACK')
+        payload = rec['payload']
+        n = BUS._valid_anchor(payload.get('chain_anchor'), records)
+        require(n < rec['event']['seq'], 'DETECTION_ANCHOR_NOT_BEFORE_FEEDBACK')
+        refs = payload.get('evidence_ref')
+        require(isinstance(refs, list) and 1 <= len(refs) <= 1000 and
+                all(isinstance(x, str) and SHA256.fullmatch(x) for x in refs) and
+                len(set(refs)) == len(refs), 'BAD_SIGNED_EVIDENCE_REFS')
+        idx = {r['event']['event_id']: r for r in records[:n]}
+        source_types = {'sensor_heartbeat','fs_change','ci_event','config_change',
+                        'process_event','network_event','auth_event'}
+        paths = []
+        for ref in refs:
+            source = idx.get(ref)
+            require(source is not None and source['event']['event_type'] in source_types,
+                    'EVIDENCE_NOT_IN_SIGNED_PREFIX')
+            if source['event']['event_type'] == 'fs_change':
+                path = source['payload'].get('path')
+                if isinstance(path, str) and path.startswith('/') and path not in paths:
+                    paths.append(path)
+        require(payload.get('target_paths') == paths,
+                'TARGETS_NOT_DERIVED_FROM_SIGNED_SOURCES')
+        require(paths == [target], 'TARGET_NOT_SUPPORTED_BY_SIGNED_SOURCE')
+        result = review(grant_id, target, rec, clock=clock)
+        if result['status'] == 'HOLD':
+            result['reason'] = 'SIGNED_FEEDBACK_VERIFIED_GUARD_INERT'
+            result['layer2_chain_verified'] = True
+        return result
+    except (BUS.BusError, GuardError, GRANT.GrantError, OSError,
+            ValueError, KeyError, TypeError, AttributeError) as exc:
+        reason = exc.code if isinstance(exc, GuardError) else (
+            'INVALID_SIGNED_EVENT_BUS' if isinstance(exc, BUS.BusError)
+            else 'INVALID_SIGNED_FEEDBACK_OR_LOCAL_STATE')
+        return outcome('BLOCKED', reason, grant_id=grant_id, target=target)
+
+
 def load_event(path):
     p = Path(path)
     if p.is_symlink():
@@ -160,10 +216,17 @@ def main(argv=None):
     preflight.add_argument("--grant", required=True)
     preflight.add_argument("--target", required=True)
     preflight.add_argument("--detection", required=True, help="local JSON record, never trusted as signed")
+    signed = cmd.add_parser("inspect-bus", help="verify actual signed feedback; always HOLD or BLOCKED")
+    signed.add_argument("--grant", required=True)
+    signed.add_argument("--target", required=True)
+    signed.add_argument("--detection-event", required=True)
     args = ap.parse_args(argv)
     try:
-        det = load_event(args.detection)
-        res = review(args.grant, args.target, det)
+        if args.command == 'inspect-bus':
+            res = review_signed_bus(args.grant, args.target, args.detection_event)
+        else:
+            det = load_event(args.detection)
+            res = review(args.grant, args.target, det)
     except GuardError as exc:
         res = outcome("BLOCKED", exc.code, grant_id=args.grant, target=args.target)
     print(json.dumps(res, sort_keys=True))

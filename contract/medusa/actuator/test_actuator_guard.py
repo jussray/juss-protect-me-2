@@ -13,6 +13,8 @@ import unittest
 
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 import actuator_guard as guard
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'detection'))
 A=guard.GRANT
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -175,6 +177,101 @@ class ActuatorPreflightTests(unittest.TestCase):
         self.grants.rename(moved)
         self.grants.symlink_to(moved)
         self.assertEqual(self.assess()['reason'], 'GRANT_STORE_MISSING_OR_UNSAFE')
+
+
+    def _setup_bus_inputs(self):
+        import eventbus as B
+        import bus_adapter as A
+        keys = {}
+        pubs = {}
+        for sensor in ('fs-1','detect-1'):
+            key = Ed25519PrivateKey.generate()
+            p = self.root / (sensor + '.pem')
+            p.write_bytes(key.private_bytes(serialization.Encoding.PEM,
+                serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
+            p.chmod(0o600)
+            keys[sensor] = str(p)
+            pubs[sensor] = base64.b64encode(key.public_key().public_bytes(
+                serialization.Encoding.Raw,serialization.PublicFormat.Raw)).decode()
+        trust = self.root / 'sensors.json'
+        trust.write_text(json.dumps({'sensors':pubs}));trust.chmod(0o600)
+        prior = {k:os.environ.get(k) for k in ('MEDUSA_BUS_DIR','MEDUSA_TRUSTED_SENSORS')}
+        self.addCleanup(lambda: self._restore_bus_env(prior))
+        os.environ['MEDUSA_BUS_DIR'] = str(self.root / 'bus')
+        os.environ['MEDUSA_TRUSTED_SENSORS'] = str(trust)
+        return B,A,keys
+
+    @staticmethod
+    def _restore_bus_env(old):
+        for k,v in old.items():
+            if v is None:os.environ.pop(k,None)
+            else:os.environ[k]=v
+
+    def _real_feedback(self):
+        B,A,keys = self._setup_bus_inputs()
+        B.append_event('fs-1','fs_change',
+            {'path':str(self.target),'action':'write'},keys['fs-1'])
+        rules=[{'ruleset_id':'synthetic','version':'1','rules':[{
+            'id':'fs-001','description':'synthetic fixture',
+            'severity':'High','confidence':'medium','confidence_basis':'synthetic-only',
+            'window_seconds':0,'when':{'event_type':'fs_change',
+                'where':{'action':'write'},'path_glob':'**/example.txt'}}]}]
+        out=A.run(rules,emit=True,emit_key=keys['detect-1'])
+        self.assertEqual(len(out),1)
+        feedback=[x for x in B.read_events() if x['event']['event_type']=='detection_feedback']
+        self.assertEqual(len(feedback),1)
+        return B,keys,feedback[0]['event']['event_id']
+
+    def test_signed_bus_verified_feedback_still_holds(self):
+        B,keys,eid=self._real_feedback()
+        old=self.target.read_bytes()
+        result=guard.review_signed_bus('g-quarantine',str(self.target),eid)
+        self.assertEqual(result['status'],'HOLD')
+        self.assertTrue(result['layer2_chain_verified'])
+        self.assertFalse(result['releasable'])
+        self.assertFalse(result['effect_executed'])
+        self.assertEqual(self.target.read_bytes(),old)
+
+    def test_signed_bus_unknown_event_blocks(self):
+        self._real_feedback()
+        result=guard.review_signed_bus('g-quarantine',str(self.target),'a'*64)
+        self.assertEqual(result['reason'],'SIGNED_DETECTION_NOT_FOUND')
+        self.assertEqual(result['status'],'BLOCKED')
+
+    def test_signed_bus_tampered_source_blocks(self):
+        B,keys,eid=self._real_feedback()
+        ledger=self.root/'bus'/'events.jsonl'
+        lines=ledger.read_text().splitlines()
+        changed=json.loads(lines[0]);changed['payload']['path']='/tampered'
+        lines[0]=json.dumps(changed)
+        ledger.write_text('\n'.join(lines)+'\n')
+        result=guard.review_signed_bus('g-quarantine',str(self.target),eid)
+        self.assertEqual(result['status'],'BLOCKED')
+        self.assertEqual(result['reason'],'INVALID_SIGNED_EVENT_BUS')
+        self.assertTrue(self.target.exists())
+
+    def test_signed_bus_forged_target_claim_blocks(self):
+        B,A,keys=self._setup_bus_inputs()
+        eid=B.append_event('fs-1','fs_change',
+            {'path':str(self.scope/'unrelated.txt'),'action':'write'},keys['fs-1'])
+        anchor=B.verified_snapshot()['anchor']
+        payload={'rule_id':'fs-001','ruleset_sha256':'b'*64,
+                 'severity':'High','confidence':'medium','evidence_tag':'VERIFIED',
+                 'evidence_ref':[eid],'detection_id':'a'*64,
+                 'target_paths':[str(self.target)],'chain_anchor':anchor}
+        feedback=B.append_event('detect-1','detection_feedback',
+             payload,keys['detect-1'],dedupe_key='detection_id',chain_anchor=anchor)
+        result=guard.review_signed_bus('g-quarantine',str(self.target),feedback)
+        self.assertEqual(result['reason'],'TARGETS_NOT_DERIVED_FROM_SIGNED_SOURCES')
+        self.assertEqual(result['status'],'BLOCKED')
+
+    def test_signed_bus_cli_never_allows(self):
+        B,keys,eid=self._real_feedback()
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            rc=guard.main(['inspect-bus','--grant','g-quarantine','--target',
+                 str(self.target),'--detection-event',eid])
+        self.assertEqual(rc,2)
+        self.assertEqual(json.loads(out.getvalue())['status'],'HOLD')
 
     def test_no_effect_capability(self):
         self.assertFalse(hasattr(guard,'execute'))
