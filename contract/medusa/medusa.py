@@ -57,12 +57,16 @@ def substantive(obj, *keys):
         {"unknown", "todo", "tbd", "pending", "none", "n/a", "unspecified"} for k in keys)
 
 
+# Floor only: a short quote can occur in almost any admitted source by chance.
+MIN_QUOTE_CHARS = 12
+
+
 def verify_quote(item, documents, errors, prefix):
-    """Require exact in-scope text quote; hash-only is never VERIFIED."""
+    """Require exact in-scope text quote of at least MIN_QUOTE_CHARS; hash-only is never VERIFIED."""
     path = item.get("source_path")
     quote = item.get("quote")
-    if not isinstance(path, str) or not isinstance(quote, str) or not quote.strip():
-        errors.append(f"{prefix}: VERIFIED requires source_path and nonblank quote")
+    if not isinstance(path, str) or not isinstance(quote, str) or len(quote.strip()) < MIN_QUOTE_CHARS:
+        errors.append(f"{prefix}: VERIFIED requires source_path and a quote of at least {MIN_QUOTE_CHARS} characters")
         return
     source = documents.get(path)
     if source is None:

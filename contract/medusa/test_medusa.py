@@ -54,6 +54,12 @@ class MedusaTests(unittest.TestCase):
         del self.doc["stone"]["quote"]
         self.assertEqual(medusa.check(self.doc, self.assessment)["gate"], "BLOCKED")
 
+    def test_short_quote_blocked(self):
+        # "e" occurs in the admitted material, so only the length floor can block it.
+        self.valid_stone()
+        self.doc["stone"]["quote"] = "e"
+        self.assertEqual(medusa.check(self.doc, self.assessment)["gate"], "BLOCKED")
+
     def test_out_of_scope_quote_source_blocked(self):
         self.valid_stone()
         self.doc["stone"]["source_path"] = "not-admitted.txt"
