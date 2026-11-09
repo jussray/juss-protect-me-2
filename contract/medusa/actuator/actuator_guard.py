@@ -116,6 +116,9 @@ def review(grant_id, target, detection, *, clock=None):
     """No execution path. Structural + signature checks for diagnostic review."""
     try:
         GRANT.safe_id(grant_id)
+        # GRANT.directory() can create missing storage. Preflight must not.
+        store = Path(os.environ.get('MEDUSA_GRANTS_DIR', str(Path.home() / '.config/medusa/grants')))
+        require(store.is_dir() and not store.is_symlink(), 'GRANT_STORE_MISSING_OR_UNSAFE')
         trusted = GRANT.signer_db()
         grant = GRANT.verify_record(grant_id, trusted)
         require(grant["action_class"] in SUPPORTED, "ACTION_NOT_IMPLEMENTED")

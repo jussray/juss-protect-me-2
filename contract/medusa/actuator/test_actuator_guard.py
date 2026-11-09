@@ -164,6 +164,18 @@ class ActuatorPreflightTests(unittest.TestCase):
         after={p.relative_to(self.root).as_posix():p.read_bytes() for p in self.root.rglob('*') if p.is_file()}
         self.assertEqual(before,after)
 
+    def test_missing_grant_store_is_not_created(self):
+        import shutil
+        shutil.rmtree(self.grants)
+        self.assertEqual(self.assess()['reason'], 'GRANT_STORE_MISSING_OR_UNSAFE')
+        self.assertFalse(self.grants.exists())
+
+    def test_symlink_grant_store_refused(self):
+        moved = self.root / 'actual_grants'
+        self.grants.rename(moved)
+        self.grants.symlink_to(moved)
+        self.assertEqual(self.assess()['reason'], 'GRANT_STORE_MISSING_OR_UNSAFE')
+
     def test_no_effect_capability(self):
         self.assertFalse(hasattr(guard,'execute'))
         self.assertFalse(hasattr(guard,'undo'))
