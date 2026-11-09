@@ -26,6 +26,8 @@ jobs:
       - run: npm ci
       - name: Gate + Shield unit tests
         run: npm test
+      - name: Medusa unit tests (contract/medusa, pinned cryptography)
+        run: python3 -m unittest discover -s contract/medusa -p 'test_*.py' -v
       - name: Gate runs on the example map
         run: python3 gate/worlds_gate.py examples/worlds.example.json examples/patches.example.json > /dev/null
       - name: Package contains only the allowlist (no dev state, git data, env files, internal profiles)
