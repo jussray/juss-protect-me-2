@@ -7,3 +7,11 @@ Run `python3 -m unittest discover -s . -p 'test_detect_core.py' -v`.
 The rule vocabulary is intentionally smaller than the user-supplied prototype. `path_glob` uses bounded wildcard matching instead of potentially catastrophic backtracking regex. `sequence` supports ordered, distinct-sensor multi-event patterns. `count` preserves all event IDs (up to 1000), never just the first 20. Unknown predicates, missing baselines and malformed events fail closed. There is no wall-clock timeout; finite rule/event/input limits are the safety control. Match-time profiling needs to be added before production. The 5k events x 200 rules bound is an upper bound, not a performance guarantee.
 
 Next integration gate: implement, test and independently verify an append-only signed Layer 2 event bus, then adapt this core to consume its authenticated immutable snapshot, reverify evidence IDs and append `detection_feedback` with a separate signing key. There is NO automatic promotion to VERIFIED by passing a boolean. Run full CI and a safe replay test; do not enable actions.
+
+## Offline CLI (snapshot only)
+
+`python3 detect.py validate --rules rules.filesystem.json`
+
+`python3 detect.py run --events events.json --rules rules.filesystem.json --baseline baseline.json --json`
+
+The events input is a JSON array of `{event_id,event_type,sensor_id,observed_at,payload}`. Baseline is a JSON object mapping baseline names to known-string lists, e.g. `{"paths-30d": ["/srv/app/.env"]}`. Every emitted finding remains `INFERRED`, not `VERIFIED`, because snapshot authenticity is not proven by this standalone tool. Error status 2 is fail-closed. Output status 0 never authorizes an action.
