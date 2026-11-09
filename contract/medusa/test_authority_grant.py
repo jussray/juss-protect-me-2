@@ -73,6 +73,20 @@ class AuthorityGrantTests(unittest.TestCase):
         self.assertEqual(self.cli('verify', 'parent')[0], 0)
         self.assertIn('1 events', self.cli('audit')[1])
 
+    def test_world_writable_trust_file_is_refused(self):
+        self.trust.chmod(0o666)
+        self.assert_blocked(self.issue(), 'trust file permissions')
+
+    def test_unsafe_trust_directory_is_refused(self):
+        self.root.chmod(0o777)
+        self.addCleanup(lambda: self.root.chmod(0o700))
+        self.assert_blocked(self.issue(), 'trust directory permissions')
+
+    def test_duplicate_public_key_cannot_name_two_deciders(self):
+        self.entries[1]['public_key_b64'] = self.entries[0]['public_key_b64']
+        self.trust.write_text(json.dumps({'signers': self.entries}))
+        self.assert_blocked(self.issue(), 'duplicate public signing key')
+
     def test_identity_cannot_be_confused(self):
         result = self.cli('issue', '--decider', 'alice', '--key', self.keys['eve'],
                           '--action-class', 'quarantine_file', '--target-scope', '/srv/apps/payments')
