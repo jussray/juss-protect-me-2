@@ -18,6 +18,11 @@ jobs:
         with:
           node-version: '22'
           cache: npm
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - name: Install pinned Medusa Ed25519 dependency
+        run: python3 -m pip install --disable-pip-version-check 'cryptography==46.0.4'
       - run: npm ci
       - name: Gate + Shield unit tests
         run: npm test
