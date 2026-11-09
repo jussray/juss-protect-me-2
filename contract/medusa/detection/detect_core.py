@@ -21,6 +21,10 @@ MAX_OUTPUT = 200
 MAX_SEQUENCE = 6
 MAX_WINDOW = 86400
 MAX_BASELINE = 10000
+# Hard resource budgets; exceeding a limit aborts the report, never drops evidence.
+MAX_PREDICATE_NODES = 50
+MAX_MATCH_CALLS = 20000
+MAX_DETECTION_BYTES = 64 * 1024
 
 class DetectionError(ValueError):
     pass
@@ -64,7 +68,25 @@ def validate_events(events):
     out.sort(key=lambda x:(x[0],x[1]['event_id']))
     return out
 
+def _predicate_nodes(root):
+    # A predicate tree may be shallow but very wide. Count nodes, not only depth.
+    pending = [root]
+    count = 0
+    while pending:
+        node = pending.pop()
+        count += 1
+        need(count <= MAX_PREDICATE_NODES, 'predicate node budget exceeded')
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if key in ('all', 'any') and isinstance(value, list):
+                    pending.extend(value)
+                elif key == 'not':
+                    pending.append(value)
+    return count
+
 def validate_predicate(p, depth=0):
+    if depth == 0:
+        _predicate_nodes(p)
     need(depth <= 8 and isinstance(p,dict) and p,'bad predicate')
     allowed={'event_type','where','path_glob','sensor_id_prefix','all','any','not'}
     need(set(p)<=allowed,'unknown predicate (fail-closed)')
@@ -81,12 +103,15 @@ def validate_predicate(p, depth=0):
             need(isinstance(v,str) and 1 <= len(v) <= 150 and v.count('*') <= 4 and not any(c in v for c in '[]{}\\'),'unsafe path glob')
         else: need(isinstance(v,str) and 1 <= len(v) <= 100,'bad string predicate')
 
-def matches(e,p):
+def matches(e,p,budget=None):
+    if budget is not None:
+        budget[0] += 1
+        need(budget[0] <= MAX_MATCH_CALLS, 'rule match budget exceeded')
     # Conjunction across every supplied key, not just first matching key.
     for k,v in p.items():
-        if k=='all': ok=all(matches(e,x) for x in v)
-        elif k=='any': ok=any(matches(e,x) for x in v)
-        elif k=='not': ok=not matches(e,v)
+        if k=='all': ok=all(matches(e,x,budget) for x in v)
+        elif k=='any': ok=any(matches(e,x,budget) for x in v)
+        elif k=='not': ok=not matches(e,v,budget)
         elif k=='where': ok=all(event_value(e,f)==expected for f,expected in v.items())
         elif k=='path_glob':
             path=event_value(e,'path')
@@ -138,7 +163,7 @@ def _group(e, field):
         return posixpath.dirname(path) if isinstance(path,str) and path.startswith('/') else None
     return '_'
 
-def _sequence(seq, ordered, window, distinct):
+def _sequence(seq, ordered, window, distinct, budget):
     """Bounded streaming correlation. Overflow BLOCKS rather than silently missing hits."""
     # Each stage retains candidate witnesses for future steps. Greedy one-state
     # matching is incorrect under distinct_sensors and window constraints.
@@ -146,7 +171,7 @@ def _sequence(seq, ordered, window, distinct):
     MAX_STATES_PER_STAGE=96
     for t,e in ordered:
         for step in range(len(seq)-1,-1,-1):
-            if not matches(e,seq[step]):
+            if not matches(e,seq[step],budget):
                 continue
             if step==0:
                 candidate=(t,(e['event_id'],),frozenset((e['sensor_id'],)))
@@ -184,13 +209,13 @@ def detect(events, rulesets, baseline=None):
     out=[]
     end=ordered[-1][0] if ordered else None
     for rule,rid,version,rhash in rules:
-        when=rule['when'];window=rule['window_seconds']
+        when=rule['when'];window=rule['window_seconds'];budget=[0]
         events_in_window=[(t,e) for t,e in ordered if end is not None and (not window or 0<=(end-t).total_seconds()<=window)]
         refs=[];extras={}
         if 'count' in when:
             spec=when['count'];groups=defaultdict(list)
             for _,e in events_in_window:
-                if matches(e,spec['match']):
+                if matches(e,spec['match'],budget):
                     g=_group(e,spec['group_by'])
                     if g is not None:groups[g].append(e['event_id'])
             qualified=[(g,ids) for g,ids in groups.items() if len(ids)>=spec['threshold']]
@@ -199,15 +224,15 @@ def detect(events, rulesets, baseline=None):
                 need(len(refs)<=MAX_REFS,'count witness too large')
                 extras={'group':group,'count':len(refs)}
         elif 'sequence' in when:
-            refs=_sequence(when['sequence'],events_in_window,window,when.get('distinct_sensors',False)) or []
+            refs=_sequence(when['sequence'],events_in_window,window,when.get('distinct_sensors',False),budget) or []
         elif 'not_in_baseline' in when:
             values=baseline.get(when['baseline'])
             need(isinstance(values,list) and all(isinstance(x,str) for x in values),'baseline absent or invalid (fail closed)')
             known=set(values)
-            refs=[e['event_id'] for _,e in events_in_window if matches(e,when['match']) and
+            refs=[e['event_id'] for _,e in events_in_window if matches(e,when['match'],budget) and
                   isinstance(event_value(e,when['not_in_baseline']),str) and
                   event_value(e,when['not_in_baseline']) not in known]
-        else:refs=[e['event_id'] for _,e in events_in_window if matches(e,when)]
+        else:refs=[e['event_id'] for _,e in events_in_window if matches(e,when,budget)]
         if refs:
             need(len(refs)<=MAX_REFS,'evidence witness too large')
             out.append({'rule_id':rule['id'],'ruleset_id':rid,'ruleset_version':version,
@@ -217,6 +242,7 @@ def detect(events, rulesets, baseline=None):
                         'evidence_tag':'INFERRED',
                         'evidence_note':'Layer 2 signed event chain not yet verified',
                         'evidence_ref':refs,**extras})
+            need(len(canonical(out[-1])) <= MAX_DETECTION_BYTES, 'detection exceeds size budget')
             need(len(out)<=MAX_OUTPUT,'too many detections')
     out.sort(key=lambda d:(-SEVERITIES[d['severity']],-CONFIDENCES[d['confidence']],d['rule_id']))
     return out

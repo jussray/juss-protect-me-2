@@ -70,6 +70,24 @@ class DetectionTests(unittest.TestCase):
         saved=copy.deepcopy((es,rs,b));d.detect(es,rs,b);self.assertEqual((es,rs,b),saved)
     def test_limits_fail_closed(self):
         with self.assertRaises(d.DetectionError):d.detect([ev(str(i)) for i in range(d.MAX_EVENTS+1)],[doc(rule({'event_type':'fs_change'}))])
+    def test_predicate_node_budget_refuses_wide_rule(self):
+        broad={'all':[{'all':[{'event_type':'fs_change'} for _ in range(10)]}
+                      for _ in range(5)]}
+        with self.assertRaisesRegex(d.DetectionError,'predicate node budget'):
+            d.detect([ev('a')],[doc(rule(broad))])
+
+    def test_detection_size_budget_refuses_full_witness_without_truncation(self):
+        # Full evidence remains required; huge IDs cannot be quietly truncated.
+        matches=[ev(('x'*100)+str(i).zfill(4)) for i in range(900)]
+        with self.assertRaisesRegex(d.DetectionError,'detection exceeds size budget'):
+            d.detect(matches,[doc(rule({'event_type':'fs_change'}))])
+
+    def test_match_budget_fails_closed(self):
+        many=[ev(str(i)) for i in range(3000)]
+        r=doc(rule({'all':[{'event_type':'fs_change'} for _ in range(12)]}))
+        with self.assertRaisesRegex(d.DetectionError,'rule match budget exceeded'):
+            d.detect(many,[r])
+
     def test_no_actuator_import(self):
         import inspect
         source=inspect.getsource(d)
