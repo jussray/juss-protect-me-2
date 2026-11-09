@@ -1,0 +1,27 @@
+{
+  "ruleset_id": "filesystem-v1",
+  "version": "2026.11.08",
+  "rules": [
+    {
+      "id": "fs-sensitive-write",
+      "description": "Config or environment file written outside CI",
+      "severity": "High", "confidence": "medium", "confidence_basis": "Filename and source match, intent is unknown",
+      "window_seconds": 0,
+      "when": {"all": [{"event_type": "fs_change"}, {"where": {"action": "write"}}, {"path_glob": "**/.env"}, {"not": {"sensor_id_prefix": "ci-"}}]}
+    },
+    {
+      "id": "fs-mass-write",
+      "description": "At least 100 writes in a minute in one directory",
+      "severity": "Medium", "confidence": "high", "confidence_basis": "Quantitative count over independently supplied events",
+      "window_seconds": 60,
+      "when": {"count": {"match": {"event_type": "fs_change", "where": {"action": "write"}}, "group_by": "path_prefix", "threshold": 100}}
+    },
+    {
+      "id": "fs-unusual-path",
+      "description": "Write to a path absent from frozen baseline",
+      "severity": "Low", "confidence": "low", "confidence_basis": "Novelty does not establish malicious intent",
+      "window_seconds": 0,
+      "when": {"not_in_baseline": "path", "baseline": "paths-30d", "match": {"event_type": "fs_change", "where": {"action": "write"}}}
+    }
+  ]
+}
