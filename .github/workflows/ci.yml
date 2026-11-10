@@ -28,6 +28,18 @@ jobs:
         run: npm test
       - name: Medusa unit tests (contract/medusa, pinned cryptography)
         run: python3 -m unittest discover -s contract/medusa -p 'test_*.py' -v
+      - name: Medusa manifest integrity and coverage
+        run: |
+          set -euo pipefail
+          cd contract/medusa
+          sha256sum --strict -c SHA256SUMS
+          python3 - <<'PYCODE'
+          from pathlib import Path
+          expected = {p.name for p in Path('.').iterdir() if p.is_file() and p.name != 'SHA256SUMS'}
+          listed = [line.split('  ', 1)[1] for line in Path('SHA256SUMS').read_text().splitlines() if line]
+          if len(listed) != len(set(listed)) or set(listed) != expected:
+              raise SystemExit(f'SHA256SUMS coverage mismatch: missing={sorted(expected - set(listed))}; unexpected={sorted(set(listed) - expected)}')
+          PYCODE
       - name: Gate runs on the example map
         run: python3 gate/worlds_gate.py examples/worlds.example.json examples/patches.example.json > /dev/null
       - name: Package contains only the allowlist (no dev state, git data, env files, internal profiles)
