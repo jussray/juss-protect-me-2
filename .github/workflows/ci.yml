@@ -35,7 +35,8 @@ jobs:
           sha256sum --strict -c SHA256SUMS
           python3 - <<'PYCODE'
           from pathlib import Path
-          expected = {p.name for p in Path('.').iterdir() if p.is_file() and p.name != 'SHA256SUMS'}
+          import subprocess
+          expected = set(subprocess.check_output(['git', 'ls-files', '--', '.'], text=True).splitlines()) - {'SHA256SUMS'}
           listed = [line.split('  ', 1)[1] for line in Path('SHA256SUMS').read_text().splitlines() if line]
           if len(listed) != len(set(listed)) or set(listed) != expected:
               raise SystemExit(f'SHA256SUMS coverage mismatch: missing={sorted(expected - set(listed))}; unexpected={sorted(set(listed) - expected)}')
