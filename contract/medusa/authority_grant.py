@@ -146,9 +146,22 @@ def directory():
 
 def signer_db():
     p = Path(os.environ.get("MEDUSA_TRUSTED_SIGNERS", str(Path.home() / ".config/medusa/trusted_signers.json")))
+    # Protect local root-of-trust against writable files, symlink substitution
+    # and replacement through a writable immediate parent directory.
+    for candidate, kind in ((p, "file"), (p.parent, "directory")):
+        try:
+            info = candidate.lstat()
+        except OSError as exc:
+            raise GrantError(f"trust {kind} not available") from exc
+        require(not stat.S_ISLNK(info.st_mode), f"trust {kind} may not be a symlink")
+        require(stat.S_ISREG(info.st_mode) if kind == "file" else stat.S_ISDIR(info.st_mode),
+                f"trust {kind} has unsafe type")
+        require(info.st_uid in (os.getuid(), 0), f"trust {kind} owner not authorized")
+        require((info.st_mode & 0o022) == 0, f"trust {kind} permissions allow untrusted writes")
     data = json_file(p)
     require(isinstance(data.get("signers"), list), "signers list missing")
     by_name = {}
+    used_keys = set()
     for entry in data["signers"]:
         require(isinstance(entry, dict) and isinstance(entry.get("decider"), str), "invalid signer")
         decider = entry["decider"]
@@ -158,6 +171,9 @@ def signer_db():
             key = Ed25519PublicKey.from_public_bytes(base64.b64decode(pub, validate=True))
         except (ValueError, TypeError) as exc:
             raise GrantError("invalid signer public key") from exc
+        canonical_key = key.public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+        require(canonical_key not in used_keys, "duplicate public signing key across deciders")
+        used_keys.add(canonical_key)
         by_name[decider] = (entry, key)
     return by_name
 
