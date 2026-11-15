@@ -1,0 +1,46 @@
+{
+  "ruleset_id": "config-integrity-v1",
+  "version": "2026.11.15",
+  "rules": [
+    {
+      "id": "config-modified",
+      "description": "A locally monitored configuration file changed since its signed baseline",
+      "severity": "High",
+      "confidence": "medium",
+      "confidence_basis": "Signed sensor hash change; operator intent is not established",
+      "window_seconds": 0,
+      "when": {
+        "all": [
+          {
+            "event_type": "config_change"
+          },
+          {
+            "where": {
+              "action": "modified"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "config-missing",
+      "description": "A locally monitored configuration file became unavailable",
+      "severity": "High",
+      "confidence": "medium",
+      "confidence_basis": "Signed sensor saw a missing file; cause is unconfirmed",
+      "window_seconds": 0,
+      "when": {
+        "all": [
+          {
+            "event_type": "config_change"
+          },
+          {
+            "where": {
+              "action": "missing"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
