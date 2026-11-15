@@ -77,6 +77,13 @@ class ConfigRuntimeTests(unittest.TestCase):
             SENSOR.scan_once([str(self.file), str(self.file)], key=self.keys["config-1"])
         self.assertEqual(len(BUS.read_events()), 0)
 
+    def test_invalid_second_path_never_writes_partial_baseline(self):
+        broken = self.root / "bad-link"
+        broken.symlink_to(self.file)
+        with self.assertRaises(BUS.BusError):
+            SENSOR.scan_once([str(self.file), str(broken)], key=self.keys["config-1"])
+        self.assertEqual(BUS.read_events(), [])
+
     def test_supervisor_only_runs_in_lab_and_never_acts(self):
         rules = [{"ruleset_id": "config-test", "version": "1", "rules": [{
             "id": "change", "description": "synthetic config change",
