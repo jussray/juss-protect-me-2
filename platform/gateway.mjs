@@ -47,8 +47,12 @@ export async function evaluateCheck(store, user, body) {
   if (rateLimited(user.id)) reasons.push('rate_limit');
   const tool = typeof body?.tool === 'string' ? body.tool : '';
   const policy = user.policy || {};
+  // Tool names use the same grammar as the account policy editor.
+  // An omitted or malformed name must never bypass the gateway check.
+  if (!tool || tool.length > 64 || !/^[A-Za-z0-9][A-Za-z0-9_.:-]*$/.test(tool)) reasons.push('invalid_tool');
   if (Array.isArray(policy.tools) && tool && !policy.tools.includes(tool)) reasons.push('tool_not_allowed');
-  if (tool && DEFAULT_DENIED_TOOLS.some((d) => tool === d || tool.startsWith('admin'))) reasons.push('tool_denied_by_default');
+  const normalizedTool = tool.toLowerCase();
+  if (normalizedTool.startsWith('admin') || DEFAULT_DENIED_TOOLS.includes(normalizedTool)) reasons.push('tool_denied_by_default');
   if (Array.isArray(policy.deniedTools) && policy.deniedTools.includes(tool)) reasons.push('tool_denied_by_member');
   const content = typeof body?.content === 'string' ? body.content : '';
   if (content.length > 65536) reasons.push('payload_too_large');
