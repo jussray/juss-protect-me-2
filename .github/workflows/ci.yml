@@ -1,7 +1,7 @@
 name: Protect Me CI
 on:
   push:
-    branches: [main]
+    branches: [main, repair/gateway-require-tool-id]
   pull_request:
   workflow_dispatch:
 permissions:
