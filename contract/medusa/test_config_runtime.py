@@ -94,7 +94,7 @@ class ConfigRuntimeTests(unittest.TestCase):
                 {"event_type": "config_change"},
                 {"where": {"action": "modified"}}
             ]}
-        ]}]
+        }]}]
         args = dict(paths=[str(self.file)], sensor_key=self.keys["config-1"],
                     rulesets=rules, detect_key=self.keys["detect-1"])
         first = DAEMON.run_once(**args)
