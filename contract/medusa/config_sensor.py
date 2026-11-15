@@ -92,9 +92,13 @@ def scan_once(paths, *, key, sensor_id="config-1"):
                   "missing" if digest is None else
                   "restored" if previous[path_id] is None else "modified")
         pending.append((path_id, digest, action))
-    emitted = []
-    for path_id, digest, action in pending:
-        payload = {"path_id": path_id, "content_sha256": digest, "action": action}
-        eid = BUS.append_event(sensor_id, "config_change", payload, key)
-        emitted.append({"event_id": eid, "action": action, "path_id": path_id})
-    return emitted
+    if not pending:
+        return []
+    # The preflight above remains complete before any ledger write. Each
+    # config delta retains its own signed event ID and ordered sequence.
+    events = [{"event_type": "config_change",
+               "payload": {"path_id": path_id, "content_sha256": digest, "action": action}}
+              for path_id, digest, action in pending]
+    ids = BUS.append_source_batch(sensor_id, events, key)
+    return [{"event_id": event_id, "action": action, "path_id": path_id}
+            for event_id, (path_id, digest, action) in zip(ids, pending)]

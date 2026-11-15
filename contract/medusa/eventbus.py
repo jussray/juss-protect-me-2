@@ -274,6 +274,103 @@ def append_event(sensor_id,event_type,payload,key,observed_at=None,dedupe_key=No
         _save_head(d,len(records)+1,digest(rec))
         return eid
 
+
+# Opt-in throughput path. One full validation and durable checkpoint per bounded
+# batch, not one full-history scan and fsync for every event. The canonical
+# single-event append (including deduplicated detection_feedback) is unchanged.
+MAX_SOURCE_BATCH = 100
+SOURCE_TYPES = {'sensor_heartbeat', 'fs_change', 'ci_event', 'config_change',
+                'process_event', 'network_event', 'auth_event'}
+
+
+def append_source_batch(sensor_id, events, key):
+    """Append 1..100 source observations atomically under the writer lock.
+
+    Input: [{"event_type": SOURCE_TYPE, "payload": dict,
+             "observed_at": optional RFC3339 timestamp}, ...]
+    Returns event IDs in exactly the ledger order. No feedback/action events.
+    Every existing event and the head are reverified before the batch, then
+    the entire signed batch is fsynced before an atomic head update. A crash
+    between writes blocks subsequent reads/appends until inspected; no replay
+    or silent repair. This is NOT independent off-host evidence custody.
+    """
+    if not isinstance(sensor_id, str) or not ID.fullmatch(sensor_id):
+        raise BusError('invalid sensor_id')
+    if not isinstance(events, list) or not 1 <= len(events) <= MAX_SOURCE_BATCH:
+        raise BusError('source batch must contain 1..100 events')
+    validated = []
+    for item in events:
+        if not isinstance(item, dict) or not {'event_type', 'payload'} <= item.keys() \
+                or set(item) - {'event_type', 'payload', 'observed_at'}:
+            raise BusError('invalid batch source event schema')
+        kind, payload = item['event_type'], item['payload']
+        if kind not in SOURCE_TYPES:
+            raise BusError('batch only accepts source event types')
+        if not isinstance(payload, dict) or len(canon(payload)) > MAX_PAYLOAD_BYTES:
+            raise BusError('batch payload invalid or oversized')
+        safe_payload(payload)
+        when = item.get('observed_at') or utc_now()
+        parse_iso(when)
+        validated.append((kind, payload, when))
+    if not key:
+        raise BusError('batch signing key required')
+    key_path = Path(key)
+    key_state = key_path.lstat()
+    if not stat.S_ISREG(key_state.st_mode) or key_state.st_nlink != 1 or key_state.st_mode & 0o077:
+        raise BusError('private key file permission or type unsafe')
+    private = serialization.load_pem_private_key(regular_bytes(key_path, 8192), password=None)
+    if not hasattr(private, 'public_key') or not hasattr(private, 'sign'):
+        raise BusError('invalid signing key type')
+    public = private.public_key().public_bytes(encoding=serialization.Encoding.Raw,
+                                                format=serialization.PublicFormat.Raw)
+    with lock_bus() as d:
+        keys = trusted()
+        if sensor_id not in keys:
+            raise BusError('sensor must be registered by a trusted administrator')
+        expected = keys[sensor_id].public_bytes(encoding=serialization.Encoding.Raw,
+                                                format=serialization.PublicFormat.Raw)
+        if expected != public:
+            raise BusError('sensor key mismatch')
+        prior = _read_unlocked(d, keys)  # Every earlier signature, hash and head.
+        if len(prior) + len(validated) > MAX_EVENTS:
+            raise BusError('event cap exceeded')
+        previous = digest(prior[-1]) if prior else ZERO
+        seq = len(prior)
+        ids, lines = [], []
+        for kind, payload, when in validated:
+            seq += 1
+            base = {'version': 1, 'sensor_id': sensor_id, 'event_type': kind,
+                    'observed_at': when, 'seq': seq, 'prev_sha256': previous,
+                    'payload_sha256': digest(payload)}
+            event_id = digest(base)
+            event = {**base, 'event_id': event_id,
+                     'signature': private.sign(canon({**base, 'event_id': event_id})).hex()}
+            record = {'event': event, 'payload': payload}
+            line = canon(record) + b'\n'
+            if len(line) - 1 > MAX_RECORD_BYTES:
+                raise BusError('batch event record too large')
+            lines.append(line)
+            ids.append(event_id)
+            previous = digest(record)
+        ledger = d / 'events.jsonl'
+        old_bytes = ledger.stat().st_size if ledger.exists() else 0
+        block = b''.join(lines)
+        if old_bytes + len(block) > MAX_LEDGER_BYTES:
+            raise BusError('ledger byte cap exceeded')
+        fd = os.open(ledger, os.O_CREAT | os.O_WRONLY | os.O_APPEND |
+                     getattr(os, 'O_NOFOLLOW', 0), 0o600)
+        with os.fdopen(fd, 'ab') as f:
+            if not stat.S_ISREG(os.fstat(f.fileno()).st_mode):
+                raise BusError('ledger not regular')
+            written = f.write(block)
+            if written != len(block):
+                raise BusError('incomplete batch write; ledger HOLD')
+            f.flush()
+            os.fsync(f.fileno())
+        _save_head(d, seq, previous)
+        return ids
+
+
 def main(argv=None):
     p=argparse.ArgumentParser(description=__doc__)
     s=p.add_subparsers(dest='cmd',required=True)
