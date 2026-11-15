@@ -76,7 +76,9 @@ def scan_once(paths, *, key, sensor_id="config-1"):
             payload = record["payload"]
             if isinstance(payload.get("path_id"), str):
                 previous[payload["path_id"]] = payload.get("content_sha256")
-    emitted = []
+    # Validate and fingerprint the entire requested set before any ledger write;
+    # an unsafe second path must not leave a partial first-path baseline.
+    pending = []
     for filename in paths:
         if not isinstance(filename, str) or not os.path.isabs(filename):
             raise BUS.BusError("config path must be absolute")
@@ -89,6 +91,9 @@ def scan_once(paths, *, key, sensor_id="config-1"):
         action = ("baseline" if path_id not in previous else
                   "missing" if digest is None else
                   "restored" if previous[path_id] is None else "modified")
+        pending.append((path_id, digest, action))
+    emitted = []
+    for path_id, digest, action in pending:
         payload = {"path_id": path_id, "content_sha256": digest, "action": action}
         eid = BUS.append_event(sensor_id, "config_change", payload, key)
         emitted.append({"event_id": eid, "action": action, "path_id": path_id})
