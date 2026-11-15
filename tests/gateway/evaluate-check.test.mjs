@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { evaluateCheck, createGateway } from '../../platform/gateway.mjs';
 
 let nextId = 0;
@@ -43,4 +44,36 @@ test('HTTP gateway refuses absent authorization before evaluating a tool', async
   const data = await response.json();
   assert.equal(data.decision, 'block');
   assert.ok(data.reasons.includes('invalid_key'));
+});
+
+test('authenticated HTTP gateway rejects missing tool and records block', async () => {
+  const key = 'jp2_synthetic-fixture-key';
+  const id = 'gateway-http-synthetic';
+  const hash = createHash('sha256').update(key).digest('hex');
+  const values = new Map([
+    ['keyhash:' + hash, id],
+    ['user:' + id, { id, entitlement: 'active', policy: { tools: ['report.generate'] } }],
+    ['actions:' + id, []],
+  ]);
+  const store = {
+    get: async (k) => values.get(k) ?? null,
+    put: async (k, v) => { values.set(k, v); },
+  };
+  const gateway = createGateway({ store });
+  const request = (body) => new Request('https://example.invalid/gateway/check', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const denied = await gateway.fetch(request({ content: 'synthetic' }), {});
+  assert.equal(denied.status, 200);
+  const result = await denied.json();
+  assert.equal(result.decision, 'block');
+  assert.ok(result.reasons.includes('missing_tool'));
+  const actions = values.get('actions:' + id);
+  assert.equal(actions.length, 1);
+  assert.equal(actions[0].decision, 'block');
+
+  const allowed = await gateway.fetch(request({ tool: 'report.generate' }), {});
+  assert.equal((await allowed.json()).decision, 'allow');
 });
