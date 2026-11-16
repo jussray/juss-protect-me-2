@@ -36,24 +36,33 @@ export async function findUserByKey(store, apiKey) {
   if (!apiKey || !apiKey.startsWith('jp2_')) return null;
   const hash = await sha256Hex(apiKey);
   const indexed = await store.get(`keyhash:${hash}`);
-  if (indexed) return store.get(`user:${indexed}`);
+  if (indexed) {
+    const user = await store.get(`user:${indexed}`);
+    // KV indexes are hints, never authority: verify the key belongs to this exact user.
+    if (user?.plan === 'two' && user.apiKeyHash === hash) return user;
+  }
   const users = await listUsers(store);
-  return users.find((u) => u.apiKeyHash === hash) || null;
+  return users.find((u) => u.plan === 'two' && u.apiKeyHash === hash) || null;
 }
 
 export async function evaluateCheck(store, user, body) {
   const reasons = [];
-  if (user.entitlement !== 'active') reasons.push(`membership_${user.entitlement}`);
-  if (rateLimited(user.id)) reasons.push('rate_limit');
-  const tool = typeof body?.tool === 'string' ? body.tool : '';
-  const policy = user.policy || {};
-  if (Array.isArray(policy.tools) && tool && !policy.tools.includes(tool)) reasons.push('tool_not_allowed');
-  if (tool && DEFAULT_DENIED_TOOLS.some((d) => tool === d || tool.startsWith('admin'))) reasons.push('tool_denied_by_default');
-  if (Array.isArray(policy.deniedTools) && policy.deniedTools.includes(tool)) reasons.push('tool_denied_by_member');
+  // Only Model Two memberships can authorize Model Two agent actions.
+  if (user?.plan !== 'two') reasons.push('wrong_product');
+  if (user?.entitlement !== 'active') reasons.push('membership_inactive');
+  if (rateLimited(user?.id || 'unknown')) reasons.push('rate_limit');
+  const tool = typeof body?.tool === 'string' ? body.tool.trim() : '';
+  const lowerTool = tool.toLowerCase();
+  const validTool = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$/.test(tool);
+  if (!validTool) reasons.push('invalid_tool');
+  const policy = user?.policy || {};
+  if (Array.isArray(policy.tools) && !policy.tools.includes(tool)) reasons.push('tool_not_allowed');
+  if (validTool && (DEFAULT_DENIED_TOOLS.includes(lowerTool) || lowerTool.startsWith('admin'))) reasons.push('tool_denied_by_default');
+  if (Array.isArray(policy.deniedTools) && policy.deniedTools.some((d) => typeof d === 'string' && d.toLowerCase() === lowerTool)) reasons.push('tool_denied_by_member');
   const content = typeof body?.content === 'string' ? body.content : '';
   if (content.length > 65536) reasons.push('payload_too_large');
   if (CREDENTIAL_PATTERNS.some((re) => re.test(content))) reasons.push('credential_content_blocked');
-  return { decision: reasons.length ? 'block' : 'allow', reasons, tool };
+  return { decision: reasons.length ? 'block' : 'allow', reasons, tool: validTool ? tool : null };
 }
 
 export function createGateway({ store }) {
