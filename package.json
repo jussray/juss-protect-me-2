@@ -30,7 +30,7 @@
   },
   "devDependencies": {
     "@playwright/test": "1.61.1",
-    "wrangler": "4.118.0"
+    "wrangler": "4.163.0"
   },
   "files": [
     "README.md",
