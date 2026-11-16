@@ -3,6 +3,9 @@
   "main": "./worker.mjs",
   "compatibility_date": "2026-10-15",
   "vars": { "FOUNDER_EMAIL": "founder@jussco.company", "FOUNDER_SALT": "522f4db95eb15e6844c660932f51ccb6" },
+  "previews": {
+    "vars": { "FOUNDER_EMAIL": "founder-preview@invalid.example", "FOUNDER_SALT": "preview-only-not-a-secret" }
+  },
   "kv_namespaces": [
     { "binding": "USERS_KV", "id": "0ca2131926744e449af8959b56ff00d7" }
   ],
