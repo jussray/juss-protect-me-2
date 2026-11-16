@@ -216,6 +216,8 @@ def detect(events, rulesets, baseline=None):
             raise DetectionError('detection runtime deadline conflicts with active timer')
         prior = signal.getsignal(signal.SIGALRM)
         signal.signal(signal.SIGALRM, _deadline_expired)
+    except DetectionError:
+        raise  # Preserve specific fail-closed collision reason.
     except (OSError, ValueError) as exc:
         raise DetectionError('detection runtime deadline unavailable') from exc
     try:
