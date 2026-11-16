@@ -189,3 +189,14 @@ test('dedicated Juss Protect Me 2 guide has clear navigation, SEO facts and resp
   expect(robots.status()).toBe(200);
   expect(await robots.text()).toContain('Sitemap: https://protect2.jussco.company/sitemap.xml');
 });
+
+test('production gateway refuses requests without bearer credentials', async ({ request }) => {
+  const response = await request.post('/gateway/check', {
+    data: { content: 'synthetic test only' },
+  });
+  expect(response.status()).toBe(401);
+  const result = await response.json();
+  expect(result.decision).toBe('block');
+  expect(result.reasons).toContain('invalid_key');
+  expect(response.headers()['x-content-type-options']).toBe('nosniff');
+});

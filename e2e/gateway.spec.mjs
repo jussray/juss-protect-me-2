@@ -1,13 +1,10 @@
 import { test, expect } from '@playwright/test';
 
-// Real local Wrangler/Worker route, no customer key or persistent member state.
-test('gateway real-path refuses requests without bearer credentials', async ({ request }) => {
-  const missing = await request.post('/gateway/check', {
-    data: { content: 'synthetic test only' },
+// This Playwright suite runs against shield/example/wrangler.jsonc.
+// The standalone Shield example must not claim to serve the member gateway.
+test('standalone Shield fixture does not expose member gateway', async ({ request }) => {
+  const response = await request.post('/gateway/check', {
+    data: { tool: 'report.generate', content: 'synthetic fixture only' },
   });
-  expect(missing.status()).toBe(401);
-  const result = await missing.json();
-  expect(result.decision).toBe('block');
-  expect(result.reasons).toContain('invalid_key');
-  expect(missing.headers()['x-content-type-options']).toBe('nosniff');
+  expect(response.status()).toBe(404);
 });
