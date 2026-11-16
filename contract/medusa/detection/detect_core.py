@@ -9,6 +9,7 @@ import fnmatch
 import hashlib
 import json
 import posixpath
+import signal
 from datetime import datetime, timezone
 from collections import defaultdict
 
@@ -25,6 +26,7 @@ MAX_BASELINE = 10000
 MAX_PREDICATE_NODES = 50
 MAX_MATCH_CALLS = 20000
 MAX_DETECTION_BYTES = 64 * 1024
+MAX_RUN_TIME_S = 30.0  # Complete detection call, including input validation.
 
 class DetectionError(ValueError):
     pass
@@ -195,7 +197,36 @@ def _sequence(seq, ordered, window, distinct, budget):
             stages[i]=[row for row in stages[i] if (t-row[0]).total_seconds()<=window]
     return None
 
+def _deadline_expired(_signum, _frame):
+    raise DetectionError('detection cumulative runtime deadline exceeded')
+
+
 def detect(events, rulesets, baseline=None):
+    """Run the pure detector with a hard cumulative POSIX wall-clock budget.
+
+    Do not return partial findings when the budget expires. Nested process
+    alarm timers and worker-thread invocations are rejected, not bypassed.
+    """
+    required = ('SIGALRM', 'ITIMER_REAL', 'getitimer', 'setitimer')
+    if any(not hasattr(signal, name) for name in required):
+        raise DetectionError('detection runtime deadline unavailable')
+    try:
+        active = signal.getitimer(signal.ITIMER_REAL)
+        if active[0] > 0 or active[1] > 0:
+            raise DetectionError('detection runtime deadline conflicts with active timer')
+        prior = signal.getsignal(signal.SIGALRM)
+        signal.signal(signal.SIGALRM, _deadline_expired)
+    except (OSError, ValueError) as exc:
+        raise DetectionError('detection runtime deadline unavailable') from exc
+    try:
+        signal.setitimer(signal.ITIMER_REAL, MAX_RUN_TIME_S)
+        return _detect_impl(events, rulesets, baseline)
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, prior)
+
+
+def _detect_impl(events, rulesets, baseline=None):
     """Return detections; no mutation. All findings at most INFERRED until Layer 2 verifies events."""
     ordered=validate_events(events)
     need(isinstance(rulesets,list) and rulesets and len(rulesets)<=10,'rulesets must be 1..10')
