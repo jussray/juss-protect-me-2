@@ -148,7 +148,14 @@ test('T4: if the audit log cannot be written, the check fails closed as audit_un
   const store = createStore();
   const { key } = await member(store);
   const broken = { ...store, put: async (k, v, o) => { if (k.startsWith('action:')) throw new Error('KV write refused'); return store.put(k, v, o); } };
-  const res = await check(createGateway({ store: broken }), key, { tool: 'read_file' });
+  const logged = [];
+  const orig = console.error;
+  console.error = (...a) => logged.push(a);
+  let res;
+  try { res = await check(createGateway({ store: broken }), key, { tool: 'read_file' }); } finally { console.error = orig; }
+  assert.equal(logged.length, 1, 'the cause is recorded');
+  assert.match(JSON.stringify(logged[0]), /KV write refused/);
+  assert.doesNotMatch(JSON.stringify(logged[0]), /read_file/, 'request body is not logged');
   assert.equal(res.status, 503);
   const j = await res.json();
   assert.equal(j.decision, 'block');

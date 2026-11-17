@@ -111,7 +111,9 @@ export function createGateway({ store }) {
         // an action the member cannot see afterwards is not allowed to proceed.
         try {
           await store.put(actionKey(user.id, now), { at: now, tool: result.tool || null, decision: result.decision, reasons: result.reasons }, { expirationTtl: ACTION_TTL_S });
-        } catch {
+        } catch (err) {
+          // Record the cause (member id + error message only, never the request body).
+          console.error('gateway: action log write failed', { userId: user.id, error: String(err?.message || err).slice(0, 200) });
           return Response.json({ decision: 'block', reasons: ['audit_unavailable'], checkedAt: new Date().toISOString() }, { status: 503 });
         }
         return Response.json({ decision: result.decision, reasons: result.reasons, checkedAt: new Date().toISOString() });
