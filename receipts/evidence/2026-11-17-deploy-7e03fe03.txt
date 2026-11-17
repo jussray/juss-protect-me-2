@@ -1,0 +1,32 @@
+# Evidence: production deploy of juss-protect-me-2 version 7e03fe03 (PR #14)
+# Sources: wrangler 4.163.0 deploy output, Cloudflare API deployment/version records,
+# and live HTTP reads. No secrets: secret bindings are listed by name only.
+
+## wrangler deploy (from main @ f6fe688, 2026-11-17)
+Uploaded juss-protect-me-2 (3.48 sec)
+Deployed juss-protect-me-2 triggers (0.73 sec)
+  https://juss-protect-me-2.mcgill-raylene.workers.dev
+Current Version ID: 7e03fe03-01b2-4c88-bca9-f4813f693cf7
+Worker Startup Time: 2 ms
+
+## Cloudflare API: /workers/scripts/juss-protect-me-2/deployments (newest)
+created: 2026-11-17T02:22:22.261582Z
+version: 7e03fe03-01b2-4c88-bca9-f4813f693cf7 (100%)
+message: PR #14 Medusa launch gates (f6fe688)
+compatibility_date: 2026-10-15
+bindings: assets:ASSETS, plain_text:FOUNDER_EMAIL, secret_text:FOUNDER_PASSWORD,
+  plain_text:FOUNDER_SALT, ratelimit:GATEWAY_MEMBER_LIMITER:1003,
+  secret_text:SESSION_SECRET, ratelimit:SHIELD_RATE_LIMITER:1002,
+  secret_text:SHIELD_SECRET, kv_namespace:USERS_KV:0ca2131926744e449af8959b56ff00d7
+previous version: a5190986-f214-4aa4-bd34-5b7242943f84 (rollback target)
+
+## Live runtime witness (2026-11-17, after deploy)
+GET  /api/status        -> 200 {"service":"juss-protect-me-2","component":"edge-shield","scope":"this-worker-only","state":"serving","otherSystemsProtected":false}
+GET  /how-it-works      -> 200, contains "configured checks can allow or block requests"
+POST /gateway/check (no key) -> 401 {"decision":"block","reasons":["invalid_key"]}
+
+## Known issues found after deploy (Medusa pass on 7e03fe03), fixed in the follow-up PR
+T2 GATEWAY_MEMBER_LIMITER namespace 1003 is also bound by jussbeautifulhair-site (JBH_RATE_LIMITER:1003).
+T3 rate-limit binding is per Cloudflare location and approximate, not worldwide.
+T4 audit-log write failure threw (500, no decision).
+T5 action log entries had a 90-day TTL with no cap.
