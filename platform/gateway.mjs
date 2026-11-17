@@ -6,7 +6,6 @@
 // to the member's action log (the "Action Insights" from the product page).
 // Honest scope: the content screen is pattern-based (credential/exfiltration
 // shapes). It is a real boundary, not a promise to catch everything.
-import { listUsers } from './store.mjs';
 import { accountToken, readAccountToken } from './payments.mjs';
 
 const enc = new TextEncoder();
@@ -23,6 +22,19 @@ const CREDENTIAL_PATTERNS = [
 ];
 const RATE_LIMIT = 60; // checks per minute per member
 const windows = new Map();
+// Tool names follow the same rule as the member's policy lists, with a length cap,
+// so a policed agent cannot write newlines or huge values into its own audit log.
+const TOOL_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9_.:-]*$/;
+const TOOL_NAME_MAX = 128;
+// One KV key per log entry: concurrent checks never overwrite each other.
+// Inverted timestamp makes ascending key order newest-first.
+const ACTION_TTL_S = 90 * 24 * 60 * 60;
+const actionPrefix = (userId) => `action:${userId}:`;
+function actionKey(userId, now) {
+  const inv = String(9999999999999 - now).padStart(13, '0');
+  const rand = [...crypto.getRandomValues(new Uint8Array(4))].map((b) => b.toString(16).padStart(2, '0')).join('');
+  return `${actionPrefix(userId)}${inv}:${rand}`;
+}
 
 function rateLimited(userId) {
   const now = Date.now();
@@ -36,19 +48,34 @@ export async function findUserByKey(store, apiKey) {
   if (!apiKey || !apiKey.startsWith('jp2_')) return null;
   const hash = await sha256Hex(apiKey);
   const indexed = await store.get(`keyhash:${hash}`);
-  if (indexed) return store.get(`user:${indexed}`);
-  const users = await listUsers(store);
-  return users.find((u) => u.apiKeyHash === hash) || null;
+  // Only the keyhash index resolves keys. There is no fallback scan of every
+  // member, so an unknown key costs one read, not one read per member.
+  return indexed ? store.get(`user:${indexed}`) : null;
 }
 
-export async function evaluateCheck(store, user, body) {
+// Per-member limit: the shared Cloudflare rate-limit binding when bound
+// (consistent across isolates), else the in-isolate window (local/tests).
+async function memberRateReason(env, userId) {
+  const limiter = env?.GATEWAY_MEMBER_LIMITER;
+  if (!limiter || typeof limiter.limit !== 'function') return rateLimited(userId) ? 'rate_limit' : null;
+  try {
+    const { success } = await limiter.limit({ key: `member:${userId}` });
+    return success ? null : 'rate_limit';
+  } catch {
+    return 'rate_limit_unavailable';
+  }
+}
+
+export async function evaluateCheck(store, user, body, env) {
   const reasons = [];
   if (user.entitlement !== 'active') reasons.push(`membership_${user.entitlement}`);
-  if (rateLimited(user.id)) reasons.push('rate_limit');
+  const rate = await memberRateReason(env, user.id);
+  if (rate) reasons.push(rate);
   const tool = typeof body?.tool === 'string' ? body.tool : '';
   // Fail closed: every action must name its tool. A missing, empty or
   // non-string tool would otherwise skip every boundary check below.
   if (!tool.trim()) reasons.push('missing_tool');
+  else if (tool.length > TOOL_NAME_MAX || !TOOL_NAME_RE.test(tool)) reasons.push('invalid_tool');
   const policy = user.policy || {};
   if (Array.isArray(policy.tools) && tool && !policy.tools.includes(tool)) reasons.push('tool_not_allowed');
   // Deny lists match a canonical form (NFKC, trimmed, lower-case) so case,
@@ -61,7 +88,8 @@ export async function evaluateCheck(store, user, body) {
   const content = typeof body?.content === 'string' ? body.content : '';
   if (content.length > 65536) reasons.push('payload_too_large');
   if (CREDENTIAL_PATTERNS.some((re) => re.test(content))) reasons.push('credential_content_blocked');
-  return { decision: reasons.length ? 'block' : 'allow', reasons, tool };
+  const loggableTool = tool && tool.length <= TOOL_NAME_MAX && TOOL_NAME_RE.test(tool) ? tool : null;
+  return { decision: reasons.length ? 'block' : 'allow', reasons, tool: loggableTool };
 }
 
 export function createGateway({ store }) {
@@ -75,19 +103,19 @@ export function createGateway({ store }) {
         if (!user) return Response.json({ decision: 'block', reasons: ['invalid_key'] }, { status: 401 });
         let body = {};
         try { body = await request.json(); } catch { return Response.json({ decision: 'block', reasons: ['invalid_json'] }, { status: 400 }); }
-        const result = await evaluateCheck(store, user, body);
-        const log = (await store.get(`actions:${user.id}`)) || [];
-        log.push({ at: Date.now(), tool: result.tool || null, decision: result.decision, reasons: result.reasons });
-        await store.put(`actions:${user.id}`, log.slice(-200));
+        const result = await evaluateCheck(store, user, body, env);
+        const now = Date.now();
+        await store.put(actionKey(user.id, now), { at: now, tool: result.tool || null, decision: result.decision, reasons: result.reasons }, { expirationTtl: ACTION_TTL_S });
         return Response.json({ decision: result.decision, reasons: result.reasons, checkedAt: new Date().toISOString() });
       }
       if (url.pathname === '/account/actions' && request.method === 'GET') {
-        const userId = await readAccountToken(env, url.searchParams.get('token') || '');
+        const userId = await readAccountToken(env, url.searchParams.get('token') || '', store);
         const user = userId ? await store.get(`user:${userId}`) : null;
         if (!user) return new Response('Account link not recognized.', { status: 404 });
-        const log = (await store.get(`actions:${user.id}`)) || [];
+        const keys = await store.list(actionPrefix(user.id), 50);
+        const log = (await Promise.all(keys.map((k) => store.get(k)))).filter(Boolean);
         if (!log.length) return new Response('No actions checked yet. When your agents act through the gateway, each check appears here in plain language.', { headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
-        const lines = log.slice(-50).reverse().map((e) =>
+        const lines = log.map((e) =>
           `${new Date(e.at).toISOString()} — ${e.tool || 'action'}: ${e.decision.toUpperCase()}${e.reasons.length ? ` (${e.reasons.join(', ')})` : ''}`);
         return new Response(lines.join('\n'), { headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' } });
       }
