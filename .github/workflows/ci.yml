@@ -29,7 +29,7 @@ jobs:
           npm pack --dry-run --json > pack.json
           node -e "
             const files = JSON.parse(require('fs').readFileSync('pack.json','utf8'))[0].files.map(f => f.path);
-            const bad = files.filter(f => /(^|\/)(\.wrangler|\.git|node_modules|profiles)(\/|$)|\.env($|\.)|\.dev\.vars|\.sqlite|\.pem$|\.key$/.test(f));
+            const bad = files.filter(f => /(^|\/)(\.wrangler|\.git|node_modules|profiles)(\/|$)|\.env($|\.)|\.dev\.vars|\.sqlite|\.pem$|\.key$|^docs\/claude\/|^receipts\//.test(f));
             console.log(files.length + ' files packed');
             if (bad.length) { console.error('LEAK:', bad); process.exit(1); }
           "
