@@ -15,8 +15,10 @@ export function createStore(env = {}) {
     return {
       kind: 'kv',
       async get(key) { const v = await kv.get(key); return v ? JSON.parse(v) : null; },
-      async put(key, value) { await kv.put(key, JSON.stringify(value)); },
+      async put(key, value, opts = {}) { await kv.put(key, JSON.stringify(value), opts.expirationTtl ? { expirationTtl: opts.expirationTtl } : undefined); },
       async del(key) { await kv.delete(key); },
+      // Key names under a prefix, ascending, at most `limit`.
+      async list(prefix, limit = 50) { const r = await kv.list({ prefix, limit }); return r.keys.map((k) => k.name); },
     };
   }
   const map = new Map();
@@ -25,6 +27,7 @@ export function createStore(env = {}) {
     async get(key) { return map.has(key) ? structuredClone(map.get(key)) : null; },
     async put(key, value) { map.set(key, structuredClone(value)); },
     async del(key) { map.delete(key); },
+    async list(prefix, limit = 50) { return [...map.keys()].filter((k) => k.startsWith(prefix)).sort().slice(0, limit); },
   };
 }
 
