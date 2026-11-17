@@ -51,8 +51,13 @@ export async function evaluateCheck(store, user, body) {
   if (!tool.trim()) reasons.push('missing_tool');
   const policy = user.policy || {};
   if (Array.isArray(policy.tools) && tool && !policy.tools.includes(tool)) reasons.push('tool_not_allowed');
-  if (tool && DEFAULT_DENIED_TOOLS.some((d) => tool === d || tool.startsWith('admin'))) reasons.push('tool_denied_by_default');
-  if (Array.isArray(policy.deniedTools) && policy.deniedTools.includes(tool)) reasons.push('tool_denied_by_member');
+  // Deny lists match a canonical form (NFKC, trimmed, lower-case) so case,
+  // padding or full-width variants cannot slip past them. The allowlist above
+  // stays exact, which is the stricter direction.
+  const canon = (s) => String(s).normalize('NFKC').trim().toLowerCase();
+  const toolKey = canon(tool);
+  if (toolKey && DEFAULT_DENIED_TOOLS.some((d) => toolKey === d || toolKey.startsWith('admin'))) reasons.push('tool_denied_by_default');
+  if (Array.isArray(policy.deniedTools) && policy.deniedTools.some((d) => canon(d) === toolKey)) reasons.push('tool_denied_by_member');
   const content = typeof body?.content === 'string' ? body.content : '';
   if (content.length > 65536) reasons.push('payload_too_large');
   if (CREDENTIAL_PATTERNS.some((re) => re.test(content))) reasons.push('credential_content_blocked');
