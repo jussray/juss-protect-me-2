@@ -1,3 +1,5 @@
+import { WorkerEntrypoint } from 'cloudflare:workers';
+import { inspectCrawlerRequest } from './shield/inspector.mjs';
 import { createShield } from './shield/shield.mjs';
 import { createFounderRoom } from './platform/founder-room.mjs';
 import { createPayments } from './platform/payments.mjs';
@@ -74,3 +76,16 @@ export default {
     });
   },
 };
+
+// Invokable only through a Cloudflare service binding to this named entrypoint.
+// No new public HTTP route or crawler trust bypass is created.
+export class ShieldInspector extends WorkerEntrypoint {
+  async inspect(input) {
+    const result = await inspectCrawlerRequest(input, this.env?.SHIELD_SECRET);
+    if (result.evidence && result.verdict !== 'NORMAL') {
+      console.log('[protect-me-shield-inspector]', JSON.stringify(result.evidence));
+    }
+    const { evidence, ...response } = result;
+    return response;
+  }
+}
