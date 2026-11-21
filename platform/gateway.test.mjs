@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { evaluateCheck } from './gateway.mjs';
 
 let n = 0;
-const member = (policy = { tools: ['read_file'] }) => ({ id: `gw-test-${++n}`, entitlement: 'active', policy });
+const member = (policy = { tools: ['read_file'] }) => ({ id: `gw-test-${++n}`, plan: 'two', entitlement: 'active', policy });
 
 test('allowlisted tool is allowed', async () => {
   const r = await evaluateCheck(null, member(), { tool: 'read_file' });

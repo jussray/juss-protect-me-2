@@ -28,7 +28,8 @@ const TOOL_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9_.:-]*$/;
 const TOOL_NAME_MAX = 128;
 // One KV key per log entry: concurrent checks never overwrite each other.
 // Inverted timestamp makes ascending key order newest-first.
-const ACTION_TTL_S = 90 * 24 * 60 * 60;
+// Entries expire after 14 days: one key per check is otherwise unbounded storage.
+const ACTION_TTL_S = 14 * 24 * 60 * 60;
 const actionPrefix = (userId) => `action:${userId}:`;
 function actionKey(userId, now) {
   const inv = String(9999999999999 - now).padStart(13, '0');
@@ -48,13 +49,18 @@ export async function findUserByKey(store, apiKey) {
   if (!apiKey || !apiKey.startsWith('jp2_')) return null;
   const hash = await sha256Hex(apiKey);
   const indexed = await store.get(`keyhash:${hash}`);
-  // Only the keyhash index resolves keys. There is no fallback scan of every
-  // member, so an unknown key costs one read, not one read per member.
-  return indexed ? store.get(`user:${indexed}`) : null;
+  // A KV index is not an authorization grant. Resolve one indexed member and
+  // revalidate the exact key hash and product identity. No full-member scan.
+  if (!indexed) return null;
+  const user = await store.get(`user:${indexed}`);
+  return user?.id === indexed && user.plan === 'two' && user.apiKeyHash === hash
+    ? user
+    : null;
 }
 
-// Per-member limit: the shared Cloudflare rate-limit binding when bound
-// (consistent across isolates), else the in-isolate window (local/tests).
+// Per-member limit: the Cloudflare rate-limit binding when bound, else the
+// in-isolate window (local/tests). The binding is approximate and counts per
+// Cloudflare location, not worldwide; a strict global limit needs a Durable Object.
 async function memberRateReason(env, userId) {
   const limiter = env?.GATEWAY_MEMBER_LIMITER;
   if (!limiter || typeof limiter.limit !== 'function') return rateLimited(userId) ? 'rate_limit' : null;
@@ -68,6 +74,8 @@ async function memberRateReason(env, userId) {
 
 export async function evaluateCheck(store, user, body, env) {
   const reasons = [];
+  // The member KV product split is defense-in-depth, not an entitlement check.
+  if (user.plan !== 'two') reasons.push('wrong_product');
   if (user.entitlement !== 'active') reasons.push(`membership_${user.entitlement}`);
   const rate = await memberRateReason(env, user.id);
   if (rate) reasons.push(rate);
@@ -105,7 +113,15 @@ export function createGateway({ store }) {
         try { body = await request.json(); } catch { return Response.json({ decision: 'block', reasons: ['invalid_json'] }, { status: 400 }); }
         const result = await evaluateCheck(store, user, body, env);
         const now = Date.now();
-        await store.put(actionKey(user.id, now), { at: now, tool: result.tool || null, decision: result.decision, reasons: result.reasons }, { expirationTtl: ACTION_TTL_S });
+        // Every check is recorded. If the record cannot be written, fail closed:
+        // an action the member cannot see afterwards is not allowed to proceed.
+        try {
+          await store.put(actionKey(user.id, now), { at: now, tool: result.tool || null, decision: result.decision, reasons: result.reasons }, { expirationTtl: ACTION_TTL_S });
+        } catch (err) {
+          // Record the cause (member id + error message only, never the request body).
+          console.error('gateway: action log write failed', { userId: user.id, error: String(err?.message || err).slice(0, 200) });
+          return Response.json({ decision: 'block', reasons: ['audit_unavailable'], checkedAt: new Date().toISOString() }, { status: 503 });
+        }
         return Response.json({ decision: result.decision, reasons: result.reasons, checkedAt: new Date().toISOString() });
       }
       if (url.pathname === '/account/actions' && request.method === 'GET') {

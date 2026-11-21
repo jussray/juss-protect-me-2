@@ -1,7 +1,7 @@
 // Launch gates from the Medusa v1.2 review of the deployed gateway (G1, G2, G3, G5, G7).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createGateway, findUserByKey } from './gateway.mjs';
+import { createGateway, evaluateCheck, findUserByKey } from './gateway.mjs';
 import { accountToken, readAccountToken, createPayments } from './payments.mjs';
 import { createStore, addUser } from './store.mjs';
 
@@ -141,4 +141,86 @@ test('G7: a failing limiter binding fails closed', async () => {
   const res = await (await check(createGateway({ store }), key, { tool: 'read_file' }, broken)).json();
   assert.equal(res.decision, 'block');
   assert.ok(res.reasons.includes('rate_limit_unavailable'));
+});
+
+// Second Medusa pass on deployed 7e03fe03 (T2, T4, T5).
+test('T4: if the audit log cannot be written, the check fails closed as audit_unavailable', async () => {
+  const store = createStore();
+  const { key } = await member(store);
+  const broken = { ...store, put: async (k, v, o) => { if (k.startsWith('action:')) throw new Error('KV write refused'); return store.put(k, v, o); } };
+  const logged = [];
+  const orig = console.error;
+  console.error = (...a) => logged.push(a);
+  let res;
+  try { res = await check(createGateway({ store: broken }), key, { tool: 'read_file' }); } finally { console.error = orig; }
+  assert.equal(logged.length, 1, 'the cause is recorded');
+  assert.match(JSON.stringify(logged[0]), /KV write refused/);
+  assert.doesNotMatch(JSON.stringify(logged[0]), /read_file/, 'request body is not logged');
+  assert.equal(res.status, 503);
+  const j = await res.json();
+  assert.equal(j.decision, 'block');
+  assert.deepEqual(j.reasons, ['audit_unavailable']);
+});
+test('T5: action log entries expire after 14 days', async () => {
+  const store = createStore();
+  const { key } = await member(store);
+  const ttls = [];
+  const spy = { ...store, put: async (k, v, o) => { if (k.startsWith('action:')) ttls.push(o?.expirationTtl); return store.put(k, v, o); } };
+  await check(createGateway({ store: spy }), key, { tool: 'read_file' });
+  assert.deepEqual(ttls, [14 * 24 * 60 * 60]);
+});
+test('T2: the member limiter uses its own rate-limit namespace (1004), not one shared with another product', async () => {
+  const { readFileSync } = await import('node:fs');
+  const cfg = JSON.parse(readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8'));
+  const ids = Object.fromEntries(cfg.ratelimits.map((r) => [r.name, r.namespace_id]));
+  assert.equal(ids.GATEWAY_MEMBER_LIMITER, '1004');
+  assert.equal(new Set(Object.values(ids)).size, Object.keys(ids).length);
+});
+
+
+// G8: the key index is only a lookup hint, never independent permission.
+test('G8: stale keyhash index cannot authorize a rotated key', async () => {
+  const store = createStore();
+  const { user, key } = await member(store);
+  await store.put('user:' + user.id, { ...user, apiKeyHash: await sha256Hex('jp2_new_rotated_key') });
+  assert.equal(await findUserByKey(store, key), null);
+  const response = await check(createGateway({ store }), key, { tool: 'read_file' });
+  assert.equal(response.status, 401);
+  assert.deepEqual((await response.json()).reasons, ['invalid_key']);
+});
+
+test('G8: an active Model One member cannot use a Model Two indexed API key', async () => {
+  const store = createStore();
+  const { user, key } = await member(store);
+  const crossProduct = { ...user, plan: 'one' };
+  await store.put('user:' + user.id, crossProduct);
+  assert.equal(await findUserByKey(store, key), null);
+  const response = await check(createGateway({ store }), key, { tool: 'read_file' });
+  assert.equal(response.status, 401);
+  assert.deepEqual((await response.json()).reasons, ['invalid_key']);
+  const evaluated = await evaluateCheck(store, crossProduct, { tool: 'read_file' }, env);
+  assert.equal(evaluated.decision, 'block');
+  assert.ok(evaluated.reasons.includes('wrong_product'));
+});
+
+test('G8: an old membership without an explicit product fails closed', async () => {
+  const store = createStore();
+  const { user, key } = await member(store);
+  const legacy = { ...user };
+  delete legacy.plan;
+  await store.put('user:' + user.id, legacy);
+  assert.equal(await findUserByKey(store, key), null);
+  const evaluated = await evaluateCheck(store, legacy, { tool: 'read_file' }, env);
+  assert.equal(evaluated.decision, 'block');
+  assert.ok(evaluated.reasons.includes('wrong_product'));
+});
+
+test('G8: valid indexed Model Two active member retains normal gateway access', async () => {
+  const store = createStore();
+  const { key } = await member(store);
+  const response = await check(createGateway({ store }), key, { tool: 'read_file' });
+  assert.equal(response.status, 200);
+  const result = await response.json();
+  assert.equal(result.decision, 'allow');
+  assert.deepEqual(result.reasons, []);
 });
