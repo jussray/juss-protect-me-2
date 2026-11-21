@@ -1,7 +1,7 @@
 // Launch gates from the Medusa v1.2 review of the deployed gateway (G1, G2, G3, G5, G7).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createGateway, findUserByKey } from './gateway.mjs';
+import { createGateway, evaluateCheck, findUserByKey } from './gateway.mjs';
 import { accountToken, readAccountToken, createPayments } from './payments.mjs';
 import { createStore, addUser } from './store.mjs';
 
@@ -175,4 +175,52 @@ test('T2: the member limiter uses its own rate-limit namespace (1004), not one s
   const ids = Object.fromEntries(cfg.ratelimits.map((r) => [r.name, r.namespace_id]));
   assert.equal(ids.GATEWAY_MEMBER_LIMITER, '1004');
   assert.equal(new Set(Object.values(ids)).size, Object.keys(ids).length);
+});
+
+
+// G8: the key index is only a lookup hint, never independent permission.
+test('G8: stale keyhash index cannot authorize a rotated key', async () => {
+  const store = createStore();
+  const { user, key } = await member(store);
+  await store.put('user:' + user.id, { ...user, apiKeyHash: await sha256Hex('jp2_new_rotated_key') });
+  assert.equal(await findUserByKey(store, key), null);
+  const response = await check(createGateway({ store }), key, { tool: 'read_file' });
+  assert.equal(response.status, 401);
+  assert.deepEqual((await response.json()).reasons, ['invalid_key']);
+});
+
+test('G8: an active Model One member cannot use a Model Two indexed API key', async () => {
+  const store = createStore();
+  const { user, key } = await member(store);
+  const crossProduct = { ...user, plan: 'one' };
+  await store.put('user:' + user.id, crossProduct);
+  assert.equal(await findUserByKey(store, key), null);
+  const response = await check(createGateway({ store }), key, { tool: 'read_file' });
+  assert.equal(response.status, 401);
+  assert.deepEqual((await response.json()).reasons, ['invalid_key']);
+  const evaluated = await evaluateCheck(store, crossProduct, { tool: 'read_file' }, env);
+  assert.equal(evaluated.decision, 'block');
+  assert.ok(evaluated.reasons.includes('wrong_product'));
+});
+
+test('G8: an old membership without an explicit product fails closed', async () => {
+  const store = createStore();
+  const { user, key } = await member(store);
+  const legacy = { ...user };
+  delete legacy.plan;
+  await store.put('user:' + user.id, legacy);
+  assert.equal(await findUserByKey(store, key), null);
+  const evaluated = await evaluateCheck(store, legacy, { tool: 'read_file' }, env);
+  assert.equal(evaluated.decision, 'block');
+  assert.ok(evaluated.reasons.includes('wrong_product'));
+});
+
+test('G8: valid indexed Model Two active member retains normal gateway access', async () => {
+  const store = createStore();
+  const { key } = await member(store);
+  const response = await check(createGateway({ store }), key, { tool: 'read_file' });
+  assert.equal(response.status, 200);
+  const result = await response.json();
+  assert.equal(result.decision, 'allow');
+  assert.deepEqual(result.reasons, []);
 });
