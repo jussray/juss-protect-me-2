@@ -77,7 +77,7 @@ export async function evaluateCheck(store, user, body, env) {
   if (!tool.trim()) reasons.push('missing_tool');
   else if (tool.length > TOOL_NAME_MAX || !TOOL_NAME_RE.test(tool)) reasons.push('invalid_tool');
   const policy = user.policy || {};
-  if (Array.isArray(policy.tools) && tool && !policy.tools.includes(tool)) reasons.push('tool_not_allowed');
+  // A missing or empty tool allowlist is not permission to use every tool.\n  // Members must explicitly authorize each permitted action.\n  if (!Array.isArray(policy.tools) || !policy.tools.includes(tool)) reasons.push('tool_not_allowed');
   // Deny lists match a canonical form (NFKC, trimmed, lower-case) so case,
   // padding or full-width variants cannot slip past them. The allowlist above
   // stays exact, which is the stricter direction.
