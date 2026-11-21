@@ -1,0 +1,27 @@
+# Evidence: production deploy of juss-protect-me-2 version b2f10ac2 (PR #15)
+# Sources: Cloudflare API deployment/version records (read-only) and live HTTP reads.
+# No secrets: secret bindings are listed by name only. Deployer email omitted.
+
+## Cloudflare API: /workers/scripts/juss-protect-me-2/deployments (newest)
+created: 2026-11-21T00:22:17.859255Z
+version: b2f10ac2-05aa-48aa-ae83-5e7a4b4a77dd (100%)
+source: wrangler (version uploaded 2026-11-21T00:22:17.291084Z)
+message: (none; no workers/message annotation)
+deployer: an account member (not this Claude Code session)
+compatibility_date: 2026-10-15
+bindings: assets:ASSETS, plain_text:FOUNDER_EMAIL, secret_text:FOUNDER_PASSWORD,
+  plain_text:FOUNDER_SALT, ratelimit:GATEWAY_MEMBER_LIMITER:1004,
+  secret_text:SESSION_SECRET, ratelimit:SHIELD_RATE_LIMITER:1002,
+  secret_text:SHIELD_SECRET, kv_namespace:USERS_KV:0ca2131926744e449af8959b56ff00d7
+previous version: 7e03fe03-01b2-4c88-bca9-f4813f693cf7 (rollback target)
+
+## Live runtime witness (2026-11-21, after deploy, no key, read-only)
+GET  /api/status        -> 200 {"service":"juss-protect-me-2","component":"edge-shield","scope":"this-worker-only","state":"serving","otherSystemsProtected":false}
+GET  /how-it-works      -> 200, contains "configured checks can allow or block requests"
+POST /gateway/check (no key) -> 401 {"decision":"block","reasons":["invalid_key"]}
+
+## What this proves and does not
+VERIFIED: T2 fixed in production (GATEWAY_MEMBER_LIMITER now on its own namespace 1004).
+INFERRED: the version was built from main @ bed3322 (PR #15 merge); the deploy record carries no commit.
+NOT VERIFIED LIVE: authenticated paths (member key binding, wrong_product, audit_unavailable,
+  14-day action TTL, limiter blocking, account-link expiry/rotation). Covered by unit tests only.
