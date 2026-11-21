@@ -49,9 +49,13 @@ export async function findUserByKey(store, apiKey) {
   if (!apiKey || !apiKey.startsWith('jp2_')) return null;
   const hash = await sha256Hex(apiKey);
   const indexed = await store.get(`keyhash:${hash}`);
-  // Only the keyhash index resolves keys. There is no fallback scan of every
-  // member, so an unknown key costs one read, not one read per member.
-  return indexed ? store.get(`user:${indexed}`) : null;
+  // A KV index is not an authorization grant. Resolve one indexed member and
+  // revalidate the exact key hash and product identity. No full-member scan.
+  if (!indexed) return null;
+  const user = await store.get(`user:${indexed}`);
+  return user?.id === indexed && user.plan === 'two' && user.apiKeyHash === hash
+    ? user
+    : null;
 }
 
 // Per-member limit: the Cloudflare rate-limit binding when bound, else the
@@ -70,6 +74,8 @@ async function memberRateReason(env, userId) {
 
 export async function evaluateCheck(store, user, body, env) {
   const reasons = [];
+  // The member KV product split is defense-in-depth, not an entitlement check.
+  if (user.plan !== 'two') reasons.push('wrong_product');
   if (user.entitlement !== 'active') reasons.push(`membership_${user.entitlement}`);
   const rate = await memberRateReason(env, user.id);
   if (rate) reasons.push(rate);
