@@ -34,10 +34,13 @@ for (const [label, body] of [
   });
 }
 
-test('member without an allowlist can still use a named, non-denied tool', async () => {
-  const r = await evaluateCheck(null, member({}), { tool: 'read_file' });
-  assert.equal(r.decision, 'allow');
-});
+for (const policy of [{}, { tools: [] }, { tools: 'read_file' }]) {
+  test(`member without an explicit array allowlist is blocked: ${JSON.stringify(policy)}`, async () => {
+    const r = await evaluateCheck(null, member(policy), { tool: 'read_file' });
+    assert.equal(r.decision, 'block');
+    assert.ok(r.reasons.includes('tool_not_allowed'), JSON.stringify(r.reasons));
+  });
+}
 
 // Deny lists must not be bypassed by case, padding or compatibility forms.
 for (const tool of ['Admin', 'ADMIN_panel', 'SHELL_EXEC', ' shell_exec ', 'File_Delete', 'ｓｈｅｌｌ_exec']) {
