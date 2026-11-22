@@ -58,15 +58,21 @@ export async function findUserByKey(store, apiKey) {
     : null;
 }
 
-// Per-member limit: the Cloudflare rate-limit binding when bound, else the
-// in-isolate window (local/tests). The binding is approximate and counts per
-// Cloudflare location, not worldwide; a strict global limit needs a Durable Object.
+// Per-member limit: production must have the Cloudflare binding. The in-isolate
+// window is permitted only when a local/test caller explicitly opts in; it is
+// not a production substitute because it resets across isolates and locations.
 async function memberRateReason(env, userId) {
   const limiter = env?.GATEWAY_MEMBER_LIMITER;
-  if (!limiter || typeof limiter.limit !== 'function') return rateLimited(userId) ? 'rate_limit' : null;
+  if (!limiter || typeof limiter.limit !== 'function') {
+    if (env?.GATEWAY_ALLOW_IN_MEMORY_RATE_LIMITER === true) {
+      return rateLimited(userId) ? 'rate_limit' : null;
+    }
+    return 'rate_limit_unavailable';
+  }
   try {
-    const { success } = await limiter.limit({ key: `member:${userId}` });
-    return success ? null : 'rate_limit';
+    const result = await limiter.limit({ key: `member:${userId}` });
+    if (!result || typeof result.success !== 'boolean') return 'rate_limit_unavailable';
+    return result.success ? null : 'rate_limit';
   } catch {
     return 'rate_limit_unavailable';
   }
