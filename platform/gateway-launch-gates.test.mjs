@@ -5,7 +5,7 @@ import { createGateway, evaluateCheck, findUserByKey } from './gateway.mjs';
 import { accountToken, readAccountToken, createPayments } from './payments.mjs';
 import { createStore, addUser } from './store.mjs';
 
-const env = { SESSION_SECRET: 'test-secret-not-real' };
+const env = { SESSION_SECRET: 'test-secret-not-real', GATEWAY_ALLOW_IN_MEMORY_RATE_LIMITER: true };
 const enc = new TextEncoder();
 const sha256Hex = async (s) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', enc.encode(s)))].map((b) => b.toString(16).padStart(2, '0')).join('');
 
