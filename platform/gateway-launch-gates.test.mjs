@@ -217,7 +217,7 @@ test('G8: an old membership without an explicit product fails closed', async () 
 
 test('G8: valid indexed Model Two active member retains normal gateway access', async () => {
   const store = createStore();
-  const { key } = await member(store);
+  const { key } = await member(store, { policy: { tools: ['read_file'] } });
   const response = await check(createGateway({ store }), key, { tool: 'read_file' });
   assert.equal(response.status, 200);
   const result = await response.json();
