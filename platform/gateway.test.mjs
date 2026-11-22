@@ -34,9 +34,18 @@ for (const [label, body] of [
   });
 }
 
-test('member without an allowlist can still use a named, non-denied tool', async () => {
-  const r = await evaluateCheck(null, member({}), { tool: 'read_file' });
+for (const policy of [{}, { tools: [] }, { deniedTools: ['deploy'] }]) {
+  test(`missing or empty allowlist fails closed: ${JSON.stringify(policy)}`, async () => {
+    const r = await evaluateCheck(null, member(policy), { tool: 'read_file' });
+    assert.equal(r.decision, 'block');
+    assert.ok(r.reasons.includes('tool_allowlist_missing'), JSON.stringify(r.reasons));
+  });
+}
+
+test('explicit allowlist still permits its named tool', async () => {
+  const r = await evaluateCheck(null, member({ tools: ['read_file'] }), { tool: 'read_file' });
   assert.equal(r.decision, 'allow');
+  assert.deepEqual(r.reasons, []);
 });
 
 // Deny lists must not be bypassed by case, padding or compatibility forms.
