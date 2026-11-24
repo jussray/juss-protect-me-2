@@ -28,5 +28,10 @@
     "may_authorize": false,
     "automated_execution_enabled_by_registry": false
   },
-  "scope": "provenance only; existing skill, runtime, tests and integrity manifest remain unchanged"
+  "scope": "provenance only; existing skill, runtime, tests and integrity manifest remain unchanged",
+  "manual_handoff": {
+    "contract_path": "contract/skill-registry/security-skill-handoff.md",
+    "version": 1,
+    "execution_enabled": false
+  }
 }
