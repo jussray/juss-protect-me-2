@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "observed_date": "2026-11-24",
+  "repository": "jussray/juss-protect-me-2",
+  "reviewed_head": "10974aed34f7806936740630c71b8e37ab12e50d",
+  "skill_git_blob": "e83d073902930b68415561b6e9ffc953467a6506",
+  "github": {
+    "run_id": 43780880614,
+    "job_id": 133019929869,
+    "overall": "failure",
+    "cause": "artifact storage quota",
+    "manifest": "success",
+    "unit_test_step": "success",
+    "browser_steps": "success",
+    "fresh_tests_run": false
+  },
+  "cloudflare": {
+    "check_id": 133017760467,
+    "previous": "failure",
+    "cause": "missing cryptography dependency",
+    "build_configuration_updated": true,
+    "readback_matched": true,
+    "preview_command_unchanged": true,
+    "build_retried": false,
+    "new_build_status": "unverified"
+  },
+  "guard": "unchanged; no execution authorized",
+  "pending": [
+    "exact source export of pasted proposals",
+    "original batches 9–11",
+    "artifact capacity",
+    "new build evidence"
+  ],
+  "publication": false
+}
