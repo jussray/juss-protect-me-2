@@ -52,17 +52,30 @@ export async function decryptClaim(env, packed) {
   return new TextDecoder().decode(pt);
 }
 
-export async function accountToken(env, userId) {
-  const sig = await hmacHex(env.SESSION_SECRET, `account:${userId}`);
-  return `${userId}.${sig}`;
+// Account links expire and are tied to the member's sessionVersion, so a
+// leaked link stops working after ACCOUNT_LINK_TTL_MS or when the member
+// rotates their gateway key (which bumps sessionVersion).
+// Format: <userId>.<expiresAtMs>.<sessionVersion>.<hmac>
+export const ACCOUNT_LINK_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+export async function accountToken(env, user, now = Date.now()) {
+  const exp = now + ACCOUNT_LINK_TTL_MS;
+  const ver = Number.isInteger(user.sessionVersion) ? user.sessionVersion : 0;
+  const sig = await hmacHex(env.SESSION_SECRET, `account:v2:${user.id}:${exp}:${ver}`);
+  return `${user.id}.${exp}.${ver}.${sig}`;
 }
-export async function readAccountToken(env, token) {
-  if (!token || !token.includes('.')) return null;
-  const cut = token.lastIndexOf('.');
-  const userId = token.slice(0, cut);
-  const sig = token.slice(cut + 1);
-  const expect = await hmacHex(env.SESSION_SECRET, `account:${userId}`);
-  return timingSafeEqual(sig, expect) ? userId : null;
+export async function readAccountToken(env, token, store, now = Date.now()) {
+  if (!token || !store) return null;
+  const parts = String(token).split('.');
+  if (parts.length < 4) return null;
+  const [sig, verRaw, expRaw] = [parts.pop(), parts.pop(), parts.pop()];
+  const userId = parts.join('.');
+  if (!userId || !/^\d+$/.test(expRaw) || !/^\d+$/.test(verRaw)) return null;
+  const expect = await hmacHex(env.SESSION_SECRET, `account:v2:${userId}:${expRaw}:${verRaw}`);
+  if (!timingSafeEqual(sig, expect)) return null;
+  if (Number(expRaw) <= now) return null;
+  const user = await store.get(`user:${userId}`);
+  const current = user && Number.isInteger(user.sessionVersion) ? user.sessionVersion : 0;
+  return user && current === Number(verRaw) ? userId : null;
 }
 
 const TOOL_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9_.:-]*$/;
@@ -97,7 +110,7 @@ export function createPayments({ store, fetchImpl = fetch }) {
       const html = (body, status = 200) => new Response(body, { status, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } });
 
       if (pathname === '/account' && request.method === 'GET') {
-        const userId = await readAccountToken(env, url.searchParams.get('token') || '');
+        const userId = await readAccountToken(env, url.searchParams.get('token') || '', store);
         const user = userId ? await store.get(`user:${userId}`) : null;
         if (!user) return new Response('Account link not recognized.', { status: 404 });
         const token = url.searchParams.get('token') || '';
@@ -109,18 +122,18 @@ export function createPayments({ store, fetchImpl = fetch }) {
         let productBlock;
         if (isTwo) {
           productBlock = `<div class="card"><h2 style="font:600 22px Georgia,serif;margin:0 0 6px">Gateway key</h2><p class="sub">Key prefix ${escapeHtml(user.apiKeyPrefix || '—')}&hellip; — the full key was shown once at checkout. Your agents send it as <code>Authorization: Bearer &lt;key&gt;</code> to the gateway check.</p><p style="margin-top:10px"><a href="/account/actions?token=${encodeURIComponent(token)}">See your action log</a></p><form method="post" action="/account/rotate"><input type="hidden" name="token" value="${escapeHtml(token)}"><button type="submit">Rotate key (old one stops working)</button></form></div>
-          <div class="card"><h2 style="font:600 22px Georgia,serif;margin:0 0 6px">Your agent boundaries</h2><p class="sub">These apply to the very next gateway check — no restart, no waiting.</p><form method="post" action="/account/policy"><input type="hidden" name="token" value="${escapeHtml(token)}"><label style="text-transform:none;letter-spacing:0;font-size:15px;color:var(--ink)"><input type="radio" name="mode" value="open" ${allowlistMode ? '' : 'checked'}>Allow tools, except the ones I block</label><label style="text-transform:none;letter-spacing:0;font-size:15px;color:var(--ink)"><input type="radio" name="mode" value="allowlist" ${allowlistMode ? 'checked' : ''}>Only allow the tools I list</label><label for="allowedTools">Allowed tools — used by "only allow" mode (comma or line separated; leave empty to pause all tools)</label><textarea id="allowedTools" name="allowedTools" rows="3" placeholder="search, calendar_read, summarize">${escapeHtml(allowed)}</textarea><label for="deniedTools">Blocked tools — blocked in both modes</label><textarea id="deniedTools" name="deniedTools" rows="2" placeholder="file_write, send_email">${escapeHtml(denied)}</textarea><p class="sub" style="margin-top:12px">Built-in dangerous tools — shell and code execution, file deletion, sending payments, admin tools — stay blocked in every mode. Your boundaries can narrow what your agents may do, never widen it past that line.</p><button type="submit">Save boundaries</button></form></div>`;
+          <div class="card"><h2 style="font:600 22px Georgia,serif;margin:0 0 6px">Your agent boundaries</h2><p class="sub">These usually apply within a minute — no restart needed.</p><form method="post" action="/account/policy"><input type="hidden" name="token" value="${escapeHtml(token)}"><label style="text-transform:none;letter-spacing:0;font-size:15px;color:var(--ink)"><input type="radio" name="mode" value="open" ${allowlistMode ? '' : 'checked'}>Allow tools, except the ones I block</label><label style="text-transform:none;letter-spacing:0;font-size:15px;color:var(--ink)"><input type="radio" name="mode" value="allowlist" ${allowlistMode ? 'checked' : ''}>Only allow the tools I list</label><label for="allowedTools">Allowed tools — used by "only allow" mode (comma or line separated; leave empty to pause all tools)</label><textarea id="allowedTools" name="allowedTools" rows="3" placeholder="search, calendar_read, summarize">${escapeHtml(allowed)}</textarea><label for="deniedTools">Blocked tools — blocked in both modes</label><textarea id="deniedTools" name="deniedTools" rows="2" placeholder="file_write, send_email">${escapeHtml(denied)}</textarea><p class="sub" style="margin-top:12px">Built-in dangerous tools — shell and code execution, file deletion, sending payments, admin tools — stay blocked in every mode. Your boundaries can narrow what your agents may do, never widen it past that line.</p><button type="submit">Save boundaries</button></form></div>`;
         } else {
           productBlock = `<div class="card"><h2 style="font:600 22px Georgia,serif;margin:0 0 6px">Your safety checkup</h2><p class="sub">Your guided checkup app is ready — open it and choose "Install this app" (or Add to Home Screen). Your answers stay on your device; the app never sends them anywhere.</p><p style="margin-top:10px"><a href="/app.html">Open the checkup app</a></p></div>`;
         }
-        const saved = url.searchParams.get('saved') ? '<div class="warn">Boundaries saved — they apply to the very next gateway check.</div>' : '';
+        const saved = url.searchParams.get('saved') ? '<div class="warn">Boundaries saved — they usually apply within a minute.</div>' : '';
         return html(pageShell('Your account', `<div class="card"><h1>Your account</h1><p class="sub">Account: ${escapeHtml(user.email)}</p><p class="sub">Product: Juss Protect Me ${isTwo ? 'Two' : 'One'}</p><p>Entitlement: ${user.entitlement.toUpperCase()}</p>${user.entitlement === 'active' ? '<p class="sub">Protection entitlement is ON.</p>' : '<p class="sub">Protection entitlement is not active on this account — the gateway blocks checks while it is off.</p>'}${saved}</div>${productBlock}`));
       }
 
       if (pathname === '/account/policy' && request.method === 'POST') {
         const form = await request.formData();
         const token = String(form.get('token') || '');
-        const userId = await readAccountToken(env, token);
+        const userId = await readAccountToken(env, token, store);
         const user = userId ? await store.get(`user:${userId}`) : null;
         if (!user || user.plan !== 'two') return new Response('Not available for this account.', { status: 403 });
         const mode = String(form.get('mode') || 'open');
@@ -157,17 +170,19 @@ export function createPayments({ store, fetchImpl = fetch }) {
 
       if (pathname === '/account/rotate' && request.method === 'POST') {
         const form = await request.formData();
-        const userId = await readAccountToken(env, String(form.get('token') || ''));
+        const userId = await readAccountToken(env, String(form.get('token') || ''), store);
         const user = userId ? await store.get(`user:${userId}`) : null;
         if (!user || user.plan !== 'two') return new Response('Not available for this account.', { status: 403 });
         const raw = `jp2_${randomHex(16)}`;
         if (user.apiKeyHash) await store.del(`keyhash:${user.apiKeyHash}`);
         user.apiKeyHash = await sha256Hex(raw);
         user.apiKeyPrefix = raw.slice(0, 8);
+        // Rotating the key also signs out every earlier account link.
+        user.sessionVersion = (Number.isInteger(user.sessionVersion) ? user.sessionVersion : 0) + 1;
         user.updatedAt = Date.now();
         await saveUser(store, user);
         await store.put(`keyhash:${user.apiKeyHash}`, user.id);
-        return html(pageShell('New key', `<div class="card"><h1>Your new gateway key</h1><div class="warn">Save it now — shown once. Your previous key stops working immediately.</div><div class="key" style="margin-top:12px">${raw}</div><p style="margin-top:16px"><a href="/account?token=${encodeURIComponent(String(form.get('token')))}">Back to your account</a></p></div>`));
+        return html(pageShell('New key', `<div class="card"><h1>Your new gateway key</h1><div class="warn">Save it now — shown once. Your previous key stops working immediately.</div><div class="key" style="margin-top:12px">${raw}</div><p style="margin-top:16px"><a href="/account?token=${encodeURIComponent(await accountToken(env, user))}">Back to your account</a></p></div>`));
       }
 
       return new Response('Not found', { status: 404 });

@@ -14,7 +14,7 @@
     "./counter-pressure": "./authority/counter-pressure.mjs"
   },
   "scripts": {
-    "test": "node --test shield/shield.test.mjs artifact/artifact-boundary.test.mjs evidence/evidence-ledger.test.mjs hallway/protocol.test.mjs authority/intent.test.mjs authority/counter-pressure.test.mjs muse-provider.test.mjs platform/jusspay-contract.test.mjs platform/medusa-review.test.mjs platform/medusa-route.test.mjs && bash scripts/run-python-tests.sh",
+    "test": "node --test shield/shield.test.mjs artifact/artifact-boundary.test.mjs evidence/evidence-ledger.test.mjs hallway/protocol.test.mjs authority/intent.test.mjs authority/counter-pressure.test.mjs muse-provider.test.mjs platform/jusspay-contract.test.mjs platform/gateway.test.mjs platform/gateway-launch-gates.test.mjs platform/medusa-review.test.mjs platform/medusa-route.test.mjs && bash scripts/run-python-tests.sh",
     "test:artifact": "node --test artifact/artifact-boundary.test.mjs",
     "test:evidence": "node --test evidence/evidence-ledger.test.mjs",
     "test:hallway": "node --test hallway/protocol.test.mjs",
@@ -30,7 +30,7 @@
   },
   "devDependencies": {
     "@playwright/test": "1.61.1",
-    "wrangler": "4.118.0"
+    "wrangler": "4.163.0"
   },
   "files": [
     "README.md",
@@ -52,7 +52,9 @@
     "e2e/shield.spec.mjs",
     "playwright.config.mjs",
     "examples/",
-    "docs/",
+    "docs/README.md",
+    "docs/SUMMARY.md",
+    "docs/security-evidence-spine.md",
     "contract/SKILL.md",
     "contract/court.json",
     "contract/references/",

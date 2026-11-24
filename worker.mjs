@@ -39,7 +39,7 @@ const app = {
 
 const shield = createShield(app, {
   service: 'juss-protect-me-2',
-  rateLimit: { paths: ['/api', '/api/*', '/founder/login', '/gateway/check'], retryAfterSeconds: 60 },
+  rateLimit: { paths: ['/api', '/api/*', '/founder', '/founder/*', '/gateway/check', '/buy', '/checkout', '/checkout/*', '/account', '/account/*', '/webhooks/stripe'], retryAfterSeconds: 60 },
 });
 
 // Keep response hardening outside Shield so decoys, limiter failures,
