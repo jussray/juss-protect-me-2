@@ -1,0 +1,5 @@
+# GitHub CI report transport
+
+Historical evidence: job 133019929869 (November 16, 2026) passed both browser suites (1 and 9 tests), then failed at artifact upload with the storage quota error. Current f910f40 CI jobs are failed but their step lists and logs are unavailable; the current root cause is not independently established. Cloudflare has separately passed 79 Node and 168 Python tests at f910f40.
+
+This change preserves all required verification commands and their fatal failure behavior. Report upload is still attempted but is explicitly treated as transport; failure is recorded in the job summary and warning. No artifact deletion, permission change, or test bypass. Missing report evidence is not an acceptance receipt. The summary lists each required step's actual outcome and checked-out SHA. Production verification requires independently observed successful required checks, not merely a green aggregate status. The new workflow requires exact-head execution to establish whether the current red CI is resolved.

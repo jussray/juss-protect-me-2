@@ -15,7 +15,7 @@ export default defineConfig({
     launchOptions: executablePath ? { executablePath } : {},
   },
   webServer: {
-    command: `npx wrangler dev --config shield/example/wrangler.jsonc --local --ip 127.0.0.1 --port ${port}`,
+    command: `node ./node_modules/wrangler/bin/wrangler.js dev --config shield/example/wrangler.jsonc --local --ip 127.0.0.1 --port ${port}`,
     url: `http://127.0.0.1:${port}/`,
     timeout: 120_000,
     reuseExistingServer: false,
