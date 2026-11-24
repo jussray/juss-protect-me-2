@@ -91,6 +91,9 @@ jobs:
       - name: Production Shield entrypoint smoke test (Playwright through wrangler dev)
         id: production_browser
         run: npx playwright test --config playwright.production.config.mjs
+      - name: Medusa authenticated local browser acceptance
+        id: medusa_browser
+        run: npx playwright test --config playwright.medusa.config.mjs
       # Report transport is not an acceptance check. Keep all tests fatal.
       - name: Upload browser reports (best-effort transport)
         id: report_upload
@@ -102,6 +105,7 @@ jobs:
           path: |
             playwright-report/
             playwright-production-report/
+            playwright-medusa-report/
             test-results/
           retention-days: 5
       - name: Record Browser verification outcomes
@@ -110,6 +114,7 @@ jobs:
           BROWSER_SETUP: ${{ steps.browser_setup.outcome }}
           SHIELD_BROWSER: ${{ steps.shield_browser.outcome }}
           PRODUCTION_BROWSER: ${{ steps.production_browser.outcome }}
+          MEDUSA_BROWSER: ${{ steps.medusa_browser.outcome }}
           REPORT_UPLOAD: ${{ steps.report_upload.outcome }}
         run: |
           {
@@ -118,6 +123,7 @@ jobs:
             echo "BROWSER_SETUP: $BROWSER_SETUP"
             echo "SHIELD_BROWSER: $SHIELD_BROWSER"
             echo "PRODUCTION_BROWSER: $PRODUCTION_BROWSER"
+            echo "MEDUSA_BROWSER: $MEDUSA_BROWSER"
             echo "REPORT_UPLOAD: $REPORT_UPLOAD"
           } >> "$GITHUB_STEP_SUMMARY"
           if [ "$REPORT_UPLOAD" != success ]; then
