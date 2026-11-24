@@ -1,3 +1,4 @@
+import { handleMedusaReview } from './medusa-review.mjs';
 // Juss Protect Me — Founder Room (standalone surface, FCR base).
 // Slots into the product Worker behind the Shield. Zero client-side JS:
 // pages are server-rendered, motion is CSS-first per the dynamic-builds
@@ -235,6 +236,12 @@ export function createFounderRoom(opts = {}) {
             'Set-Cookie': `pf_session=${encodeURIComponent(s.value)}; Path=/founder; HttpOnly; Secure; SameSite=Strict; Max-Age=${SESSION_TTL_MS / 1000}`,
           },
         });
+      }
+      if (pathname === '/founder/medusa') {
+        let s;
+        try { s = configured && await readSession(request, env); } catch { s = null; }
+        if (!s) return new Response(null, { status: 302, headers: { Location: '/founder', 'Cache-Control': 'no-store' } });
+        return handleMedusaReview(request);
       }
       if (pathname === '/founder/room' && request.method === 'GET') {
         const s = configured && (await readSession(request, env));
