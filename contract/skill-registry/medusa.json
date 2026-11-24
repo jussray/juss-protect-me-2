@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "skill": "medusa",
+  "repository": "jussray/juss-protect-me-2",
+  "registered_version": "1.1.0",
+  "execution_authorization": "none; assessment is advisory and does not confer authority",
+  "records": [
+    {
+      "id": "MEDUSA-1.1.0",
+      "version": "1.1.0",
+      "kind": "Skill definition",
+      "path": "contract/medusa/SKILL.md",
+      "source_commit": "10974aed34f7806936740630c71b8e37ab12e50d",
+      "source_blob": "53f8968789a52bb1787e601b71e0c69d69ae4442",
+      "original_created_at": null,
+      "observed_on": "2026-11-24",
+      "status": "existing branch definition",
+      "evidence": "OBSERVED repository bytes; local and CI execution not verified in this operation"
+    }
+  ],
+  "relationships": {
+    "aegis": "independent defensive review and remediation; no automated handoff",
+    "sarissa": "separate archival skill; no active testing integration"
+  },
+  "boundaries": {
+    "offline_reasoning": true,
+    "advisory_only": true,
+    "may_authorize": false,
+    "automated_execution_enabled_by_registry": false
+  },
+  "scope": "provenance only; existing skill, runtime, tests and integrity manifest remain unchanged",
+  "manual_handoff": {
+    "contract_path": "contract/skill-registry/security-skill-handoff.md",
+    "version": 1,
+    "execution_enabled": false
+  }
+}

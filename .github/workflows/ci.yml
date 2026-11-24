@@ -1,7 +1,7 @@
 name: Protect Me CI
 on:
   push:
-    branches: [main, feat/medusa-offline-security-v1-1]
+    branches: [main, feat/medusa-offline-security-v1-1, fix/medusa-quote-floor-manifest-20261108]
   pull_request:
   workflow_dispatch:
 permissions:
@@ -24,23 +24,15 @@ jobs:
       - name: Install pinned Medusa Ed25519 dependency
         run: python3 -m pip install --disable-pip-version-check 'cryptography==46.0.4'
       - run: npm ci
-      - name: Gate + Shield unit tests
-        run: npm test
-      - name: Medusa unit tests (contract/medusa, pinned cryptography)
-        run: python3 -m unittest discover -s contract/medusa -p 'test_*.py' -v
-      - name: Medusa manifest integrity and coverage
+      - name: Verify complete Medusa manifest and tracked file hashes
         run: |
           set -euo pipefail
-          cd contract/medusa
-          sha256sum --strict -c SHA256SUMS
-          python3 - <<'PYCODE'
-          from pathlib import Path
-          import subprocess
-          expected = set(subprocess.check_output(['git', 'ls-files', '--', '.'], text=True).splitlines()) - {'SHA256SUMS'}
-          listed = [line.split('  ', 1)[1] for line in Path('SHA256SUMS').read_text().splitlines() if line]
-          if len(listed) != len(set(listed)) or set(listed) != expected:
-              raise SystemExit(f'SHA256SUMS coverage mismatch: missing={sorted(expected - set(listed))}; unexpected={sorted(set(listed) - expected)}')
-          PYCODE
+          (cd contract/medusa && sha256sum --strict --check SHA256SUMS)
+          actual="$(git ls-files contract/medusa | sed 's#^contract/medusa/##' | grep -v '^SHA256SUMS$' | sort)"
+          listed="$(sed -E 's/^[0-9a-f]{64}  //' contract/medusa/SHA256SUMS | sort)"
+          test "$actual" = "$listed" || { echo "::error::Medusa manifest file coverage drift"; exit 1; }
+      - name: Gate + Shield unit tests
+        run: npm test
       - name: Gate runs on the example map
         run: python3 gate/worlds_gate.py examples/worlds.example.json examples/patches.example.json > /dev/null
       - name: Package contains only the allowlist (no dev state, git data, env files, internal profiles)

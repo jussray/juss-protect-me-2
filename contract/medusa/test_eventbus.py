@@ -26,6 +26,20 @@ def _worker(root, writer, count, queue):
         queue.put(('error',writer,type(exc).__name__,str(exc)))
 
 
+
+def _batch_worker(root, writer, count, queue):
+    os.environ['MEDUSA_BUS_DIR'] = str(Path(root) / 'bus')
+    os.environ['MEDUSA_TRUSTED_SENSORS'] = str(Path(root) / 'trusted.json')
+    try:
+        events = [{'event_type': 'sensor_heartbeat',
+                   'payload': {'writer': writer, 'iteration': i}}
+                  for i in range(count)]
+        ids = B.append_source_batch('fs-1', events, str(Path(root) / 'fs.pem'))
+        queue.put(('ok', writer, len(ids)))
+    except Exception as exc:
+        queue.put(('error', writer, type(exc).__name__, str(exc)))
+
+
 class BusTests(unittest.TestCase):
     def setUp(self):
         t=tempfile.TemporaryDirectory(prefix='medusa-ledger-')
@@ -140,6 +154,67 @@ class BusTests(unittest.TestCase):
         with self.assertRaises(B.BusError):
             B.append_event('detect-1','detection_feedback',payload,self.priv['detect-1'],
                            dedupe_key='detection_id',chain_anchor=a)
+
+    def test_source_batch_preserves_signatures_and_rejects_partial_inputs(self):
+        items = [{'event_type':'fs_change','payload':{'path':f'/tmp/test-{i}','action':'write'}}
+                 for i in range(5)]
+        ids = B.append_source_batch('fs-1', items, self.priv['fs-1'])
+        self.assertEqual(len(ids), 5)
+        snapshot = B.verified_snapshot()
+        self.assertEqual([r['event']['event_id'] for r in snapshot['records']], ids)
+        self.assertEqual([r['event']['seq'] for r in snapshot['records']], list(range(1, 6)))
+        before = (self.root/'bus/events.jsonl').read_bytes()
+        with self.assertRaisesRegex(B.BusError, 'source event types'):
+            B.append_source_batch('fs-1', items + [{'event_type':'action_result',
+                                  'payload':{}}], self.priv['fs-1'])
+        self.assertEqual((self.root/'bus/events.jsonl').read_bytes(), before)
+
+    def test_source_batch_fails_closed_on_tampered_history(self):
+        self.add()
+        ledger = self.root/'bus/events.jsonl'
+        ledger.write_text(ledger.read_text().replace('/tmp/fake/.env','/tampered'))
+        with self.assertRaises(B.BusError):
+            B.append_source_batch('fs-1', [{'event_type':'sensor_heartbeat',
+                                  'payload':{'synthetic':True}}], self.priv['fs-1'])
+        self.assertFalse(B.verify_chain()['ok'])
+
+    def test_config_sensor_uses_signed_source_batch(self):
+        import config_sensor as SENSOR
+        trusted_path = self.root/'trusted.json'
+        trusted_data = json.loads(trusted_path.read_text())
+        trusted_data['sensors']['config-1'] = trusted_data['sensors']['fs-1']
+        trusted_path.write_text(json.dumps(trusted_data))
+        paths = []
+        for i in range(12):
+            p = self.root/f'synthetic-{i}.txt'
+            p.write_text(f'content-{i}')
+            paths.append(str(p))
+        first = SENSOR.scan_once(paths, sensor_id='config-1', key=self.priv['fs-1'])
+        self.assertEqual(len(first), 12)
+        self.assertTrue(all(x['action']=='baseline' for x in first))
+        self.assertEqual(SENSOR.scan_once(paths, sensor_id='config-1', key=self.priv['fs-1']), [])
+        records = B.verified_snapshot()['records']
+        self.assertEqual([e['event_id'] for e in first],
+                         [r['event']['event_id'] for r in records])
+        self.assertNotIn('content-0', (self.root/'bus/events.jsonl').read_text())
+
+    def test_25_concurrent_verified_source_batches(self):
+        writers, count = 25, 100
+        ctx = mp.get_context('fork')
+        queue = ctx.Queue()
+        procs = [ctx.Process(target=_batch_worker, args=(str(self.root), i, count, queue))
+                 for i in range(writers)]
+        for p in procs: p.start()
+        for p in procs: p.join(80)
+        for p in procs:
+            if p.is_alive(): p.terminate(); p.join(5)
+        outputs = [queue.get(timeout=3) for _ in range(writers)]
+        self.assertTrue(all(row[0]=='ok' and row[2]==count for row in outputs), outputs)
+        self.assertTrue(all(p.exitcode==0 for p in procs))
+        snap = B.verified_snapshot()
+        self.assertEqual(snap['anchor']['count'], writers*count)
+        self.assertEqual([r['event']['seq'] for r in snap['records']], list(range(1, writers*count+1)))
+        self.assertEqual(len({r['event']['event_id'] for r in snap['records']}), writers*count)
 
     def test_25_concurrent_writers_serialized(self):
         writers,count=25,10

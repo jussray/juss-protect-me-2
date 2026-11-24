@@ -88,6 +88,32 @@ class DetectionTests(unittest.TestCase):
         with self.assertRaisesRegex(d.DetectionError,'rule match budget exceeded'):
             d.detect(many,[r])
 
+    def test_cumulative_run_deadline_blocks_in_progress_execution(self):
+        import time
+        from unittest.mock import patch
+        # An active evaluation is interrupted, rather than simply checked
+        # after it finishes. No partial result can be reported as successful.
+        with patch.object(d, 'MAX_RUN_TIME_S', 0.01), \
+             patch.object(d, '_detect_impl', side_effect=lambda *_: time.sleep(0.1)):
+            with self.assertRaisesRegex(d.DetectionError, 'cumulative runtime deadline exceeded'):
+                d.detect([ev('a')],[doc(rule({'event_type':'fs_change'}))])
+
+    def test_run_deadline_handler_and_timer_restored(self):
+        import signal
+        before = signal.getsignal(signal.SIGALRM)
+        self.assertEqual(d.detect([ev('a')],[doc(rule({'event_type':'fs_change'}))])[0]['evidence_ref'], ['a'])
+        self.assertEqual(signal.getsignal(signal.SIGALRM), before)
+        self.assertEqual(signal.getitimer(signal.ITIMER_REAL)[0], 0)
+
+    def test_run_deadline_does_not_override_active_timer(self):
+        import signal
+        signal.setitimer(signal.ITIMER_REAL, 1.0)
+        try:
+            with self.assertRaisesRegex(d.DetectionError, 'conflicts with active timer'):
+                d.detect([ev('a')],[doc(rule({'event_type':'fs_change'}))])
+        finally:
+            signal.setitimer(signal.ITIMER_REAL, 0)
+
     def test_no_actuator_import(self):
         import inspect
         source=inspect.getsource(d)
