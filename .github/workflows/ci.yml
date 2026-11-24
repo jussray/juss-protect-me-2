@@ -7,7 +7,7 @@ on:
 permissions:
   contents: read
 jobs:
-  verify:
+  verify-source:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -52,6 +52,36 @@ jobs:
       - name: Preflight gate runs on the example
         id: preflight
         run: python3 contract/scripts/preflight.py examples/preflight.example.json --compact
+      - name: Record Source verification outcomes
+        if: always()
+        env:
+          MANIFEST: ${{ steps.manifest.outcome }}
+          UNIT: ${{ steps.unit.outcome }}
+          EXAMPLE: ${{ steps.example.outcome }}
+          PACKAGE: ${{ steps.package.outcome }}
+          PREFLIGHT: ${{ steps.preflight.outcome }}
+        run: |
+          {
+            echo '## Source verification outcomes'
+            echo "Exact checkout: $(git rev-parse HEAD 2>/dev/null || echo unavailable)"
+            echo "MANIFEST: $MANIFEST"
+            echo "UNIT: $UNIT"
+            echo "EXAMPLE: $EXAMPLE"
+            echo "PACKAGE: $PACKAGE"
+            echo "PREFLIGHT: $PREFLIGHT"
+          } >> "$GITHUB_STEP_SUMMARY"
+  verify-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
       - name: Install Playwright Chromium
         id: browser_setup
         run: npx playwright install --with-deps chromium
@@ -74,34 +104,37 @@ jobs:
             playwright-production-report/
             test-results/
           retention-days: 14
-      - name: Record verification and report-delivery outcomes
+      - name: Record Browser verification outcomes
         if: always()
         env:
-          MANIFEST: ${{ steps.manifest.outcome }}
-          UNIT: ${{ steps.unit.outcome }}
-          EXAMPLE: ${{ steps.example.outcome }}
-          PACKAGE: ${{ steps.package.outcome }}
-          PREFLIGHT: ${{ steps.preflight.outcome }}
           BROWSER_SETUP: ${{ steps.browser_setup.outcome }}
           SHIELD_BROWSER: ${{ steps.shield_browser.outcome }}
           PRODUCTION_BROWSER: ${{ steps.production_browser.outcome }}
           REPORT_UPLOAD: ${{ steps.report_upload.outcome }}
         run: |
           {
-            echo '## Verification outcomes'
+            echo '## Browser verification outcomes'
             echo "Exact checkout: $(git rev-parse HEAD 2>/dev/null || echo unavailable)"
-            echo '| Required step | Outcome |'
-            echo '|---|---|'
-            echo "| Verify complete Medusa manifest and tracked file hashes | $MANIFEST |"
-            echo "| Gate + Shield unit tests | $UNIT |"
-            echo "| Gate runs on the example map | $EXAMPLE |"
-            echo "| Package contains only the allowlist (no dev state, git data, env files, internal profiles) | $PACKAGE |"
-            echo "| Preflight gate runs on the example | $PREFLIGHT |"
-            echo "| Install Playwright Chromium | $BROWSER_SETUP |"
-            echo "| Shield real-path witness (Playwright through wrangler dev) | $SHIELD_BROWSER |"
-            echo "| Production Shield entrypoint smoke test (Playwright through wrangler dev) | $PRODUCTION_BROWSER |"
-            echo "| Browser report delivery (separate) | $REPORT_UPLOAD |"
+            echo "BROWSER_SETUP: $BROWSER_SETUP"
+            echo "SHIELD_BROWSER: $SHIELD_BROWSER"
+            echo "PRODUCTION_BROWSER: $PRODUCTION_BROWSER"
+            echo "REPORT_UPLOAD: $REPORT_UPLOAD"
           } >> "$GITHUB_STEP_SUMMARY"
           if [ "$REPORT_UPLOAD" != success ]; then
-            echo '::warning::Browser report delivery unavailable; see required test outcomes and runner logs. Do not infer browser success from report delivery.'
+            echo '::warning::Browser report delivery unavailable; do not infer browser success from report delivery.'
           fi
+  verify:
+    needs: [verify-source, verify-browser]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Require both verification jobs to succeed
+        env:
+          SOURCE: ${{ needs.verify-source.result }}
+          BROWSER: ${{ needs.verify-browser.result }}
+        run: |
+          set -euo pipefail
+          printf 'source=%s browser=%s\n' "$SOURCE" "$BROWSER" | tee -a "$GITHUB_STEP_SUMMARY"
+          test "$SOURCE" = success
+          test "$BROWSER" = success

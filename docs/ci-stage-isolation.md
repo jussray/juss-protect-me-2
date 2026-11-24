@@ -1,0 +1,5 @@
+# CI stage isolation
+
+The source and browser verification stages now run as independent jobs. The existing required `verify` job remains, and explicitly fails unless both jobs conclude success. Source verification retains the original setup, manifest, test, package and preflight commands; browser verification retains both original Playwright commands and report delivery. A missing, failed, skipped or canceled prerequisite cannot pass the aggregate gate. Report delivery is separately reported and is not proof of browser success.
+
+At b7dfe4b8d107d052063dd7f5dd8e0a5f3a469d11, Cloudflare and GitGuardian passed, while both GitHub verify jobs failed. Current logs and step details are unavailable. The two changed Python files and four additional manifest entries matched their SHA-256 hashes from retrieved source text. The three pinned setup action commits resolved. This stage split is diagnostic isolation, not a claim that the current failure has been fixed. Both new jobs must execute successfully before promotion.
