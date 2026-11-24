@@ -11,7 +11,9 @@ test('local Worker: founder authentication, evidence match, mismatch and logout'
   await expect(page).toHaveURL(baseURL+'/founder/room');
   const session = (await page.context().cookies()).find(c=>c.name==='pf_session');
   expect(session).toMatchObject({httpOnly:true,secure:true,sameSite:'Strict',path:'/founder'});
-  await page.goto('/founder/medusa');
+  const review = await page.goto('/founder/medusa');
+  expect(review.status()).toBe(200);
+  expect(review.headers()['referrer-policy']).toBe('same-origin');
   await expect(page.getByRole('heading',{name:'Evidence review'})).toBeVisible();
 
   const source = 'Fictional evidence example. The document is ready for review.';
@@ -20,7 +22,12 @@ test('local Worker: founder authentication, evidence match, mismatch and logout'
     await page.getByLabel('Evidence text').fill(source);
     await page.getByLabel('Expected SHA-256 of submitted text').fill(expected);
     await page.getByLabel('Exact quotation (at least 12 characters)').fill('The document is ready for review.');
-    await page.getByRole('button',{name:'Review evidence'}).click();
+    const [response] = await Promise.all([
+      page.waitForResponse(r=>r.url()===baseURL+'/founder/medusa' && r.request().method()==='POST'),
+      page.getByRole('button',{name:'Review evidence'}).click(),
+    ]);
+    expect(response.request().headers().origin).toBe(baseURL);
+    expect(response.status()).toBe(200);
   }
   await submit(hash);
   await expect(page.getByRole('heading',{name:'MATCH',exact:true})).toBeVisible();

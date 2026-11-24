@@ -64,6 +64,11 @@ export default {
     if (path === '/founder' || path.startsWith('/founder/') || path === '/checkout' || path.startsWith('/checkout/') || path === '/buy' || path === '/account' || path === '/account/rotate' || path === '/account/policy') {
       headers.set('Content-Security-Policy', "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; font-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; upgrade-insecure-requests");
     }
+    // Native same-origin review forms need a non-null Origin header.
+    // Retain no-referrer everywhere else and never disclose a cross-origin referrer.
+    if (path === '/founder/medusa') {
+      headers.set('Referrer-Policy', 'same-origin');
+    }
     if (path === '/api' || path.startsWith('/api/')) {
       headers.set('Cache-Control', 'no-store');
     }

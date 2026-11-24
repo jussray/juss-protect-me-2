@@ -3,7 +3,7 @@ const enc = new TextEncoder();
 const MAX_BODY = 100000;
 const MAX_SOURCE = 16384;
 const MAX_QUOTE = 1024;
-const headers = {'content-type':'text/html; charset=utf-8','cache-control':'no-store','referrer-policy':'no-referrer','x-content-type-options':'nosniff'};
+const headers = {'content-type':'text/html; charset=utf-8','cache-control':'no-store','referrer-policy':'same-origin','x-content-type-options':'nosniff'};
 export async function assessEvidence({source,expected,quote} = {}) {
   const base = {can_authorize:false,independent_truth_verified:false};
   if (typeof source !== 'string' || !source || enc.encode(source).length > MAX_SOURCE || typeof expected !== 'string' || !/^[0-9a-f]{64}$/i.test(expected) || typeof quote !== 'string' || quote.trim().length < 12 || enc.encode(quote).length > MAX_QUOTE) return {...base,status:'INVALID'};
