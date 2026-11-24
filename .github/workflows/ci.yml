@@ -25,6 +25,7 @@ jobs:
         run: python3 -m pip install --disable-pip-version-check 'cryptography==46.0.4'
       - run: npm ci
       - name: Verify complete Medusa manifest and tracked file hashes
+        id: manifest
         run: |
           set -euo pipefail
           (cd contract/medusa && sha256sum --strict --check SHA256SUMS)
@@ -32,10 +33,13 @@ jobs:
           listed="$(sed -E 's/^[0-9a-f]{64}  //' contract/medusa/SHA256SUMS | sort)"
           test "$actual" = "$listed" || { echo "::error::Medusa manifest file coverage drift"; exit 1; }
       - name: Gate + Shield unit tests
+        id: unit
         run: npm test
       - name: Gate runs on the example map
+        id: example
         run: python3 gate/worlds_gate.py examples/worlds.example.json examples/patches.example.json > /dev/null
       - name: Package contains only the allowlist (no dev state, git data, env files, internal profiles)
+        id: package
         run: |
           set -euo pipefail
           npm pack --dry-run --json > pack.json
@@ -46,15 +50,23 @@ jobs:
             if (bad.length) { console.error('LEAK:', bad); process.exit(1); }
           "
       - name: Preflight gate runs on the example
+        id: preflight
         run: python3 contract/scripts/preflight.py examples/preflight.example.json --compact
       - name: Install Playwright Chromium
+        id: browser_setup
         run: npx playwright install --with-deps chromium
       - name: Shield real-path witness (Playwright through wrangler dev)
+        id: shield_browser
         run: npm run e2e
       - name: Production Shield entrypoint smoke test (Playwright through wrangler dev)
+        id: production_browser
         run: npx playwright test --config playwright.production.config.mjs
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      # Report transport is not an acceptance check. Keep all tests fatal.
+      - name: Upload browser reports (best-effort transport)
+        id: report_upload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
+        continue-on-error: true
         with:
           name: playwright-report
           path: |
@@ -62,3 +74,34 @@ jobs:
             playwright-production-report/
             test-results/
           retention-days: 14
+      - name: Record verification and report-delivery outcomes
+        if: always()
+        env:
+          MANIFEST: ${{ steps.manifest.outcome }}
+          UNIT: ${{ steps.unit.outcome }}
+          EXAMPLE: ${{ steps.example.outcome }}
+          PACKAGE: ${{ steps.package.outcome }}
+          PREFLIGHT: ${{ steps.preflight.outcome }}
+          BROWSER_SETUP: ${{ steps.browser_setup.outcome }}
+          SHIELD_BROWSER: ${{ steps.shield_browser.outcome }}
+          PRODUCTION_BROWSER: ${{ steps.production_browser.outcome }}
+          REPORT_UPLOAD: ${{ steps.report_upload.outcome }}
+        run: |
+          {
+            echo '## Verification outcomes'
+            echo "Exact checkout: $(git rev-parse HEAD 2>/dev/null || echo unavailable)"
+            echo '| Required step | Outcome |'
+            echo '|---|---|'
+            echo "| Verify complete Medusa manifest and tracked file hashes | $MANIFEST |"
+            echo "| Gate + Shield unit tests | $UNIT |"
+            echo "| Gate runs on the example map | $EXAMPLE |"
+            echo "| Package contains only the allowlist (no dev state, git data, env files, internal profiles) | $PACKAGE |"
+            echo "| Preflight gate runs on the example | $PREFLIGHT |"
+            echo "| Install Playwright Chromium | $BROWSER_SETUP |"
+            echo "| Shield real-path witness (Playwright through wrangler dev) | $SHIELD_BROWSER |"
+            echo "| Production Shield entrypoint smoke test (Playwright through wrangler dev) | $PRODUCTION_BROWSER |"
+            echo "| Browser report delivery (separate) | $REPORT_UPLOAD |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$REPORT_UPLOAD" != success ]; then
+            echo '::warning::Browser report delivery unavailable; see required test outcomes and runner logs. Do not infer browser success from report delivery.'
+          fi
